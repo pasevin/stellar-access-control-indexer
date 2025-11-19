@@ -4,11 +4,24 @@ A SubQuery indexer for OpenZeppelin Stellar Access Control and Ownable contracts
 
 ## Features
 
-- Indexes `RoleGranted`, `RoleRevoked`, and `OwnershipTransferred` events
+### Complete OpenZeppelin Event Coverage
+
+**AccessControl Events:**
+- `RoleGranted` - When a role is assigned to an account
+- `RoleRevoked` - When a role is removed from an account
+- `AdminTransferInitiated` - When admin transfer begins
+- `AdminTransferCompleted` - When admin transfer is accepted
+
+**Ownable Events:**
+- `OwnershipTransferStarted` - When ownership transfer begins
+- `OwnershipTransferCompleted` - When ownership is accepted by new owner
+
+### Additional Capabilities
 - Maintains current state of role memberships and contract ownership
 - Provides server-side filtering and pagination
 - Tracks complete event history with timestamps and block heights
 - TypeScript client for easy integration
+- Support for contracts implementing AccessControl, Ownable, or both
 
 ## Important: Rate Limiting Notice
 
@@ -87,6 +100,25 @@ query {
       role
       account
       admin
+      timestamp
+      txHash
+    }
+  }
+}
+
+# Track admin transfer events
+query {
+  accessControlEvents(
+    filter: {
+      contract: { equalTo: "CONTRACT_ADDRESS" }
+      type: { in: [ADMIN_TRANSFER_INITIATED, ADMIN_TRANSFER_COMPLETED] }
+    }
+    orderBy: TIMESTAMP_DESC
+  ) {
+    nodes {
+      type
+      account  # new admin
+      admin    # previous admin
       timestamp
       txHash
     }
@@ -176,6 +208,26 @@ After deployment, you'll receive a production GraphQL endpoint:
 https://api.subquery.network/sq/{your-org}/{project-name}
 ```
 
+## Example Contract: RBAC Playground
+
+This repository includes a complete example contract (`examples/rbac-playground`) that demonstrates all OpenZeppelin Access Control features:
+
+### Features
+- Implements both AccessControl and Ownable traits
+- Custom minter role with mint/burn functions
+- Emits all 6 OpenZeppelin events
+- Role enumeration capabilities
+- Ready for testnet deployment
+
+### Quick Deploy
+```bash
+cd examples/rbac-playground
+make build    # Build the contract
+make deploy   # Deploy to testnet
+```
+
+See [examples/rbac-playground/README.md](examples/rbac-playground/README.md) for detailed instructions.
+
 ## Configuration
 
 ### Network Settings
@@ -232,12 +284,15 @@ See `schema.graphql` for complete entity definitions.
 
 ## Event Handlers
 
-| Handler                            | Event                      | Description                                                   |
-| ---------------------------------- | -------------------------- | ------------------------------------------------------------- |
-| `handleRoleGranted`                | RoleGranted                | Processes role grant events                                   |
-| `handleRoleRevoked`                | RoleRevoked                | Processes role revocation events                              |
-| `handleOwnershipTransferCompleted` | OwnershipTransferCompleted | Processes ownership transfers                                 |
-| `handleContractDeployment`         | Contract Creation          | Tracks new contract deployments via host function invocations |
+| Handler                            | Event                      | Description                                     |
+| ---------------------------------- | -------------------------- | ----------------------------------------------- |
+| `handleRoleGranted`                | RoleGranted                | Processes role grant events                    |
+| `handleRoleRevoked`                | RoleRevoked                | Processes role revocation events               |
+| `handleAdminTransferInitiated`     | AdminTransferInitiated     | Tracks when admin transfer starts              |
+| `handleAdminTransferCompleted`     | AdminTransferCompleted     | Records completed admin transfers              |
+| `handleOwnershipTransferStarted`   | OwnershipTransferStarted   | Tracks when ownership transfer begins          |
+| `handleOwnershipTransferCompleted` | OwnershipTransferCompleted | Records completed ownership transfers          |
+| `handleContractDeployment`         | Contract Creation          | Tracks new contract deployments                |
 
 ## Troubleshooting
 
