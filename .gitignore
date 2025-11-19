@@ -4,6 +4,8 @@ node_modules
 
 # SubQuery generated files
 .data
+project.yaml
+src/types/
 
 # Project files
 *.log
