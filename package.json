@@ -1,0 +1,33 @@
+{
+  "name": "stellar-access-control-indexer",
+  "version": "1.0.0",
+  "description": "SubQuery indexer for OpenZeppelin Stellar Access Control and Ownable contracts",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "subql build",
+    "codegen": "subql codegen",
+    "start:docker": "docker compose pull && docker compose up --remove-orphans",
+    "dev": "subql codegen && subql build",
+    "prepack": "rm -rf dist && npm run build",
+    "test": "subql build && subql-node-stellar test"
+  },
+  "homepage": "https://github.com/OpenZeppelin/stellar-access-control-indexer",
+  "repository": "github:OpenZeppelin/stellar-access-control-indexer",
+  "files": [
+    "dist",
+    "schema.graphql",
+    "project.ts"
+  ],
+  "author": "OpenZeppelin",
+  "license": "MIT",
+  "dependencies": {
+    "@subql/common": "latest",
+    "@subql/types-stellar": "latest"
+  },
+  "devDependencies": {
+    "@subql/cli": "latest",
+    "@subql/testing": "latest",
+    "@subql/types": "latest",
+    "typescript": "latest"
+  }
+}

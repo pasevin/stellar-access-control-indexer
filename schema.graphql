@@ -1,0 +1,66 @@
+# SubQuery Schema for OpenZeppelin Stellar Access Control
+# This schema defines entities for indexing Access Control and Ownable contracts
+# @index annotations enable server-side filtering in GraphQL queries
+
+# Access Control Event Entity
+# Tracks all role and ownership changes with full history
+type AccessControlEvent @entity {
+  id: ID! # Unique identifier: txHash-logIndex
+  contract: String! @index # Contract address
+  role: String @index # Role identifier (nullable for ownership events)
+  account: String! @index # Account receiving the role or ownership
+  admin: String # Admin/grantor address (if available)
+  type: EventType! @index # Type of event
+  blockHeight: BigInt! # Block height when event occurred
+  timestamp: Date! @index # Timestamp of the event
+  txHash: String! # Transaction hash
+  ledger: Int! # Ledger sequence number
+}
+
+# Event Types Enum
+enum EventType {
+  ROLE_GRANTED
+  ROLE_REVOKED
+  OWNERSHIP_TRANSFERRED
+}
+
+# Current Role Membership State
+# Maintains current state of role assignments for quick lookups
+type RoleMembership @entity {
+  id: ID! # Format: contract-role-account
+  contract: String! @index # Contract address
+  role: String! @index # Role identifier
+  account: String! @index # Account with the role
+  grantedAt: Date! # When the role was granted
+  grantedBy: String # Who granted the role
+  txHash: String! # Transaction that granted the role
+}
+
+# Ownership State
+# Tracks current owner of contracts implementing Ownable
+type ContractOwnership @entity {
+  id: ID! # Contract address
+  contract: String! @index # Contract address
+  owner: String! @index # Current owner
+  previousOwner: String # Previous owner
+  transferredAt: Date! # When ownership was transferred
+  txHash: String! # Transaction that transferred ownership
+}
+
+# Contract Metadata
+# Stores information about indexed contracts
+type Contract @entity {
+  id: ID! # Contract address
+  address: String! @index # Contract address
+  type: ContractType! @index # Type of contract
+  deployedAt: Date # When the contract was deployed
+  deployTxHash: String # Deployment transaction hash
+  lastActivityAt: Date! # Last event from this contract
+}
+
+# Contract Types Enum
+enum ContractType {
+  ACCESS_CONTROL
+  OWNABLE
+  ACCESS_CONTROL_OWNABLE # Contracts that implement both
+}
