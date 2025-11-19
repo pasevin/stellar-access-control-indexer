@@ -10,6 +10,17 @@ A SubQuery indexer for OpenZeppelin Stellar Access Control and Ownable contracts
 - Tracks complete event history with timestamps and block heights
 - TypeScript client for easy integration
 
+## Important: Rate Limiting Notice
+
+**⚠️ The public Stellar testnet Horizon endpoint (`horizon-testnet.stellar.org`) has very strict rate limits that make continuous indexing difficult or impossible without a private endpoint.**
+
+For production use or continuous indexing, you **must** use one of the following:
+- A private Horizon node
+- An API key from a Horizon provider (BlockDaemon, QuickNode, etc.)
+- Your own self-hosted Horizon instance
+
+The default configuration is provided for testing and development only, and you will frequently encounter HTTP 429 (rate limit) errors during startup and operation.
+
 ## Quick Start
 
 ### Prerequisites
@@ -185,6 +196,19 @@ network: {
 }
 ```
 
+**Using a private endpoint:**
+
+```typescript
+network: {
+  chainId: "Test SDF Network ; September 2015",
+  endpoint: [
+    "https://your-private-horizon-node.com",
+    "https://horizon-testnet.stellar.org"  // fallback
+  ],
+  sorobanEndpoint: "https://your-private-soroban-node.com",
+}
+```
+
 ### Start Block
 
 The indexer starts from block 1,600,000. Adjust in `project.ts`:
@@ -242,10 +266,24 @@ See `schema.graphql` for complete entity definitions.
 
 4. **Rate Limiting (HTTP 429)**: If you encounter rate limit errors from Horizon API:
 
-   - Reduce `--batch-size` to 2 or 3 in docker-compose.yml
-   - Add longer timeout: `--timeout=60000`
-   - Consider using a private Horizon node or API key for production
-   - The default public endpoint has strict rate limits for intensive indexing operations
+   - **Immediate fixes:**
+     - Reduce `--batch-size` to 1 or 2 in docker-compose.yml
+     - Increase timeout: `--timeout=90000` or higher
+     - Wait 1-2 minutes before restarting to let rate limits reset
+   
+   - **Environment variables for retry logic:**
+     ```yaml
+     environment:
+       STELLAR_ENDPOINT_RETRY_ATTEMPTS: 5
+       STELLAR_ENDPOINT_RETRY_DELAY: 10000  # 10 seconds between retries
+     ```
+   
+   - **Long-term solutions:**
+     - Use a private Horizon node
+     - Get an API key from a Horizon provider (e.g., BlockDaemon, QuickNode)
+     - Run your own Horizon instance
+   
+   - **Note:** The public Horizon endpoint has strict rate limits (~200 requests/minute). Intensive indexing operations will frequently hit these limits.
 
 5. **Container Health Check Failures**: If the subquery-node container is unhealthy:
 
