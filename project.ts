@@ -32,14 +32,15 @@ const project: StellarProject = {
       'Test SDF Future Network ; October 2022' for Future Network */
     chainId: 'Test SDF Network ; September 2015',
     /**
-     * These endpoint(s) should be public non-pruned archive node
-     * We recommend providing more than one endpoint for improved reliability, performance, and uptime
+     * Multiple endpoints for better reliability and rate limit handling
      * Public nodes may be rate limited, which can affect indexing speed
      * When developing your project we suggest getting a private API key
      * If you use a rate limited endpoint, adjust the --batch-size and --workers parameters
-     * These settings can be found in your docker-compose.yaml, they will slow indexing but prevent your project being rate limited
+     * These settings can be found in your docker-compose.yaml
      */
-    endpoint: ['https://horizon-testnet.stellar.org'],
+    endpoint: [
+      'https://horizon-testnet.stellar.org',
+    ],
     /* This is a specific Soroban endpoint
       It is only required when you are using a soroban/EventHandler */
     sorobanEndpoint: 'https://soroban-testnet.stellar.org',

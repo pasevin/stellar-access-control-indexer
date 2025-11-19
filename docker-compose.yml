@@ -33,9 +33,10 @@ services:
       - -f=/app
       - --db-schema=app
       - --workers=1
-      - --batch-size=5
+      - --batch-size=3
       - --unsafe
       - --force-clean
+      - --timeout=60000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://subquery-node:3000/ready"]
       interval: 3s

@@ -240,14 +240,21 @@ See `schema.graphql` for complete entity definitions.
    - Ensure the `--unsafe` flag is present in the docker-compose.yml command
    - This disables SubQuery's sandbox to allow Node.js built-in modules required by dependencies
 
-4. **Container Health Check Failures**: If the subquery-node container is unhealthy:
+4. **Rate Limiting (HTTP 429)**: If you encounter rate limit errors from Horizon API:
+
+   - Reduce `--batch-size` to 2 or 3 in docker-compose.yml
+   - Add longer timeout: `--timeout=60000`
+   - Consider using a private Horizon node or API key for production
+   - The default public endpoint has strict rate limits for intensive indexing operations
+
+5. **Container Health Check Failures**: If the subquery-node container is unhealthy:
 
    - Check logs: `docker compose logs subquery-node --tail 100`
    - Ensure `yarn build` completed successfully before starting containers
    - Verify all dependencies are installed: `yarn install`
    - Try rebuilding: `docker compose down && yarn build && docker compose up -d`
 
-5. **Type Generation Errors**: Ensure schema.graphql is valid:
+6. **Type Generation Errors**: Ensure schema.graphql is valid:
    ```bash
    yarn codegen
    ```
