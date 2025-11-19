@@ -187,11 +187,13 @@ network: {
 
 ### Start Block
 
-The indexer starts from block 58,000,000 (approximately when OpenZeppelin library was created). Adjust in `project.ts`:
+The indexer starts from block 1,600,000. Adjust in `project.ts`:
 
 ```typescript
-startBlock: 58000000, // Adjust based on your contracts
+startBlock: 1600000, // Adjust based on your needs
 ```
+
+**Important**: The `startBlock` must be within the available ledger range on the Stellar network. Stellar testnet typically has ledgers available from around block 1,000,000 onwards. Setting a `startBlock` that's too far in the future or beyond the current network height will cause initialization errors.
 
 ## Schema
 
@@ -222,8 +224,9 @@ See `schema.graphql` for complete entity definitions.
    ```yaml
    # docker-compose.yml
    command:
-     - --batch-size=10
+     - --batch-size=5
      - --workers=1
+     - --unsafe
    ```
 
 2. **Memory Issues**: Increase Node.js memory:
@@ -232,7 +235,19 @@ See `schema.graphql` for complete entity definitions.
    NODE_OPTIONS="--max-old-space-size=4096" yarn start:docker
    ```
 
-3. **Type Generation Errors**: Ensure schema.graphql is valid:
+3. **Module Resolution Errors**: If you see `Cannot find module 'http'` or similar errors:
+
+   - Ensure the `--unsafe` flag is present in the docker-compose.yml command
+   - This disables SubQuery's sandbox to allow Node.js built-in modules required by dependencies
+
+4. **Container Health Check Failures**: If the subquery-node container is unhealthy:
+
+   - Check logs: `docker compose logs subquery-node --tail 100`
+   - Ensure `yarn build` completed successfully before starting containers
+   - Verify all dependencies are installed: `yarn install`
+   - Try rebuilding: `docker compose down && yarn build && docker compose up -d`
+
+5. **Type Generation Errors**: Ensure schema.graphql is valid:
    ```bash
    yarn codegen
    ```

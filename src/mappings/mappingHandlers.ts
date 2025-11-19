@@ -1,3 +1,18 @@
+/**
+ * Polyfills for browser APIs required by Stellar SDK in Node.js environment
+ * MUST be at the top of the entry file before any other imports
+ */
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { TextEncoder: NodeTextEncoder, TextDecoder: NodeTextDecoder } = require('text-encoding');
+
+if (typeof global.TextEncoder === 'undefined') {
+  (global as any).TextEncoder = NodeTextEncoder;
+}
+
+if (typeof global.TextDecoder === 'undefined') {
+  (global as any).TextDecoder = NodeTextDecoder;
+}
+
 import {
   AccessControlEvent,
   RoleMembership,
@@ -7,7 +22,7 @@ import {
   ContractType,
 } from '../types';
 import { StellarOperation, SorobanEvent } from '@subql/types-stellar';
-import { xdr, StrKey } from '@stellar/stellar-sdk';
+import { xdr, StrKey } from '@stellar/stellar-base';
 
 /**
  * Handler for RoleGranted events

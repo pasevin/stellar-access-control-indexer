@@ -3,7 +3,6 @@ import {
   StellarHandlerKind,
   StellarProject,
 } from '@subql/types-stellar';
-import { Horizon } from '@stellar/stellar-sdk';
 
 /* OpenZeppelin Stellar Access Control Indexer Configuration */
 const project: StellarProject = {
@@ -48,8 +47,8 @@ const project: StellarProject = {
   dataSources: [
     {
       kind: StellarDatasourceKind.Runtime,
-      /* Start from when OpenZeppelin library was created (approximately 10 months ago) */
-      startBlock: 58000000,
+      /* Start from recent block - approximately 2 weeks ago to ensure data availability */
+      startBlock: 1600000,
       mapping: {
         file: './dist/index.js',
         handlers: [
@@ -87,8 +86,10 @@ const project: StellarProject = {
             handler: 'handleContractDeployment',
             kind: StellarHandlerKind.Operation,
             filter: {
-              /* Track contract creation operations via Host Function Invocation */
-              type: Horizon.HorizonApi.OperationResponseType.invokeHostFunction,
+              /* Track contract creation operations via Host Function Invocation
+                 Using 'invokeHostFunction' (camelCase) as per Horizon API
+                 Type assertion needed due to incomplete SubQuery type definitions */
+              type: 'invokeHostFunction' as any,
             },
           },
         ],
