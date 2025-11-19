@@ -149,6 +149,160 @@ export async function handleRoleRevoked(event: SorobanEvent): Promise<void> {
 }
 
 /**
+ * Handler for AdminTransferInitiated events
+ * Definition: fn emit_admin_transfer_initiated(e: &Env, new_admin: &Address, previous_admin: &Address)
+ * Topics: ["AdminTransferInitiated"]
+ * Data: struct { new_admin: Address, previous_admin: Address }
+ */
+export async function handleAdminTransferInitiated(
+  event: SorobanEvent
+): Promise<void> {
+  logger.info(
+    `Processing AdminTransferInitiated event at ledger ${
+      event.ledger!.sequence
+    }`
+  );
+
+  const contractAddress = event.contractId?.contractId().toString()!;
+  // In the OZ implementation, the struct fields are in the data
+  const eventData = event.value;
+  
+  // The data should be a Vec with [new_admin, previous_admin]
+  let newAdmin: string | undefined;
+  let previousAdmin: string | undefined;
+  
+  if (eventData && eventData.vec) {
+    const vecElements = eventData.vec();
+    if (vecElements && vecElements.length >= 2) {
+      newAdmin = decodeAddress(vecElements[0]);
+      previousAdmin = decodeAddress(vecElements[1]);
+    }
+  }
+
+  // Create event record
+  const eventId = `${event.id}-admin-init`;
+  const accessEvent = AccessControlEvent.create({
+    id: eventId,
+    contract: contractAddress,
+    role: undefined,
+    account: newAdmin || 'unknown',
+    admin: previousAdmin,
+    type: EventType.ADMIN_TRANSFER_INITIATED,
+    blockHeight: BigInt(event.ledger!.sequence),
+    timestamp: new Date(event.ledgerClosedAt),
+    txHash: event.transaction?.hash || 'unknown',
+    ledger: event.ledger!.sequence,
+  });
+
+  await accessEvent.save();
+}
+
+/**
+ * Handler for AdminTransferCompleted events
+ * Definition: fn emit_admin_transfer_completed(e: &Env, new_admin: &Address, previous_admin: &Address)
+ * Topics: ["AdminTransferCompleted"]
+ * Data: struct { new_admin: Address, previous_admin: Address }
+ */
+export async function handleAdminTransferCompleted(
+  event: SorobanEvent
+): Promise<void> {
+  logger.info(
+    `Processing AdminTransferCompleted event at ledger ${
+      event.ledger!.sequence
+    }`
+  );
+
+  const contractAddress = event.contractId?.contractId().toString()!;
+  // In the OZ implementation, the struct fields are in the data
+  const eventData = event.value;
+  
+  // The data should be a Vec with [new_admin, previous_admin]
+  let newAdmin: string | undefined;
+  let previousAdmin: string | undefined;
+  
+  if (eventData && eventData.vec) {
+    const vecElements = eventData.vec();
+    if (vecElements && vecElements.length >= 2) {
+      newAdmin = decodeAddress(vecElements[0]);
+      previousAdmin = decodeAddress(vecElements[1]);
+    }
+  }
+
+  // Create event record
+  const eventId = `${event.id}-admin-complete`;
+  const accessEvent = AccessControlEvent.create({
+    id: eventId,
+    contract: contractAddress,
+    role: undefined,
+    account: newAdmin || 'unknown',
+    admin: previousAdmin,
+    type: EventType.ADMIN_TRANSFER_COMPLETED,
+    blockHeight: BigInt(event.ledger!.sequence),
+    timestamp: new Date(event.ledgerClosedAt),
+    txHash: event.transaction?.hash || 'unknown',
+    ledger: event.ledger!.sequence,
+  });
+
+  // Update contract metadata
+  await updateContractMetadata(
+    contractAddress,
+    ContractType.ACCESS_CONTROL,
+    new Date(event.ledgerClosedAt)
+  );
+
+  await accessEvent.save();
+}
+
+/**
+ * Handler for OwnershipTransferStarted events
+ * Definition: fn emit_ownership_transfer_started(e: &Env, new_owner: &Address, previous_owner: &Address)
+ * Topics: ["OwnershipTransferStarted"]
+ * Data: struct { new_owner: Address, previous_owner: Address }
+ */
+export async function handleOwnershipTransferStarted(
+  event: SorobanEvent
+): Promise<void> {
+  logger.info(
+    `Processing OwnershipTransferStarted event at ledger ${
+      event.ledger!.sequence
+    }`
+  );
+
+  const contractAddress = event.contractId?.contractId().toString()!;
+  // In the OZ implementation, the struct fields are in the data
+  const eventData = event.value;
+  
+  // The data should be a Vec with [new_owner, previous_owner]
+  let newOwner: string | undefined;
+  let previousOwner: string | undefined;
+  
+  if (eventData && eventData.vec) {
+    const vecElements = eventData.vec();
+    if (vecElements && vecElements.length >= 2) {
+      newOwner = decodeAddress(vecElements[0]);
+      previousOwner = decodeAddress(vecElements[1]);
+    }
+  }
+
+  // Create event record
+  const eventId = `${event.id}-ownership-start`;
+  const accessEvent = AccessControlEvent.create({
+    id: eventId,
+    contract: contractAddress,
+    role: undefined,
+    account: newOwner || 'unknown',
+    admin: previousOwner,
+    type: EventType.OWNERSHIP_TRANSFER_STARTED,
+    blockHeight: BigInt(event.ledger!.sequence),
+    timestamp: new Date(event.ledgerClosedAt),
+    txHash: event.transaction?.hash || 'unknown',
+    ledger: event.ledger!.sequence,
+  });
+
+  await accessEvent.save();
+}
+
+/**
  * Handler for OwnershipTransferCompleted events
  * Definition: fn emit_ownership_transfer_completed(e: &Env, new_owner: &Address)
  * Topics: ["OwnershipTransferCompleted"]
@@ -184,7 +338,7 @@ export async function handleOwnershipTransferCompleted(
     role: undefined,
     account: newOwner,
     admin: previousOwner,
-    type: EventType.OWNERSHIP_TRANSFERRED,
+    type: EventType.OWNERSHIP_TRANSFER_COMPLETED,
     blockHeight: BigInt(event.ledger!.sequence),
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
