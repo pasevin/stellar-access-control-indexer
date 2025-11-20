@@ -27,22 +27,23 @@ services:
       DB_DATABASE: postgres
       DB_HOST: postgres
       DB_PORT: 5432
-      STELLAR_ENDPOINT_RETRY_ATTEMPTS: 5
-      STELLAR_ENDPOINT_RETRY_DELAY: 10000
+      STELLAR_ENDPOINT_RETRY_ATTEMPTS: 10
+      STELLAR_ENDPOINT_RETRY_DELAY: 20000
     volumes:
       - ./:/app
     command:
       - -f=/app
       - --db-schema=app
       - --workers=1
-      - --batch-size=2
+      - --batch-size=1
       - --force-clean
-      - --timeout=90000
+      - --timeout=120000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://subquery-node:3000/ready"]
-      interval: 3s
-      timeout: 5s
-      retries: 10
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 90s
 
   graphql-engine:
     image: subquerynetwork/subql-query:latest
