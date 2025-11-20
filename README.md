@@ -305,7 +305,6 @@ See `schema.graphql` for complete entity definitions.
    command:
      - --batch-size=5
      - --workers=1
-     - --unsafe
    ```
 
 2. **Memory Issues**: Increase Node.js memory:
@@ -314,10 +313,7 @@ See `schema.graphql` for complete entity definitions.
    NODE_OPTIONS="--max-old-space-size=4096" yarn start:docker
    ```
 
-3. **Module Resolution Errors**: If you see `Cannot find module 'http'` or similar errors:
-
-   - Ensure the `--unsafe` flag is present in the docker-compose.yml command
-   - This disables SubQuery's sandbox to allow Node.js built-in modules required by dependencies
+3. **Polyfills**: The indexer includes lightweight, sandbox-safe polyfills for `TextEncoder` and `TextDecoder` required by the Stellar SDK. These are compatible with SubQuery's Managed Service and don't require the `--unsafe` flag.
 
 4. **Rate Limiting (HTTP 429)**: If you encounter rate limit errors from Horizon API:
 

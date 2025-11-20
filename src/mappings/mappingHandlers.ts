@@ -1,16 +1,30 @@
 /**
- * Polyfills for browser APIs required by Stellar SDK in Node.js environment
- * MUST be at the top of the entry file before any other imports
+ * Lightweight polyfills for browser APIs required by Stellar SDK
+ * These are safe for SubQuery's sandbox environment
  */
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { TextEncoder: NodeTextEncoder, TextDecoder: NodeTextDecoder } = require('text-encoding');
-
-if (typeof global.TextEncoder === 'undefined') {
-  (global as any).TextEncoder = NodeTextEncoder;
+if (typeof TextEncoder === 'undefined') {
+  (globalThis as any).TextEncoder = class TextEncoder {
+    encode(input: string): Uint8Array {
+      const utf8 = unescape(encodeURIComponent(input));
+      const result = new Uint8Array(utf8.length);
+      for (let i = 0; i < utf8.length; i++) {
+        result[i] = utf8.charCodeAt(i);
+      }
+      return result;
+    }
+  };
 }
 
-if (typeof global.TextDecoder === 'undefined') {
-  (global as any).TextDecoder = NodeTextDecoder;
+if (typeof TextDecoder === 'undefined') {
+  (globalThis as any).TextDecoder = class TextDecoder {
+    decode(input: Uint8Array): string {
+      let result = '';
+      for (let i = 0; i < input.length; i++) {
+        result += String.fromCharCode(input[i]);
+      }
+      return decodeURIComponent(escape(result));
+    }
+  };
 }
 
 import {

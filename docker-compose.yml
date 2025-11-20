@@ -36,7 +36,6 @@ services:
       - --db-schema=app
       - --workers=1
       - --batch-size=2
-      - --unsafe
       - --force-clean
       - --timeout=90000
     healthcheck:
