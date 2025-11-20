@@ -5,6 +5,7 @@ This guide covers deploying the Stellar Access Control Indexer to the **SubQuery
 ## Overview
 
 The SubQuery Network is a public, permission-less, decentralized data indexing network. Deploying to it ensures:
+
 - **Unstoppable infrastructure** - ~100 decentralized, geographically isolated indexers
 - **Superior performance** - Global indexers provide low latency to all users
 - **Infinite scalability** - Scales automatically as demand grows
@@ -38,7 +39,7 @@ Ensure `package.json` uses the correct build command:
 ```json
 {
   "scripts": {
-    "build": "subql build"  // NOT "tsc -b"
+    "build": "subql build" // NOT "tsc -b"
   }
 }
 ```
@@ -50,11 +51,13 @@ Ensure `package.json` uses the correct build command:
 The SubQuery Network requires deterministic proof-of-indexing results:
 
 **❌ AVOID:**
+
 - Random ordered DB operations (e.g., `Promise.all()` in mapping functions without ordering)
 - Runtime-dependent data (e.g., `new Date()` without blockchain data)
 - External API calls that may return different results
 
 **✅ OUR PROJECT STATUS:**
+
 - Uses sequential `await` operations ✓
 - All timestamps from blockchain (`event.ledgerClosedAt`) ✓
 - No external API calls in mappings ✓
@@ -65,6 +68,7 @@ The SubQuery Network requires deterministic proof-of-indexing results:
 The SubQuery Network does **not** support GraphQL subscriptions:
 
 **❌ DO NOT USE:**
+
 - `--subscription` flag in command line arguments
 - GraphQL subscription queries in your application
 
@@ -72,50 +76,101 @@ Reference: [GraphQL Subscriptions](https://subquery.network/doc/indexer/run_publ
 
 **✅ OUR PROJECT STATUS:** We don't use subscriptions. ✓
 
-### 5. Multi-Network Support (Optional but Recommended)
+### 5. Multi-Network/Multi-Chain Support (Optional but Recommended)
 
-For projects supporting multiple networks (testnet/mainnet), use SubQuery's multi-chain indexing pattern:
+SubQuery supports indexing multiple blockchain networks with shared business logic and a single codebase. This is useful for:
+- **Different chains** (Stellar, Polkadot, Ethereum, Cosmos, etc.)
+- **Same chain, different networks** (Stellar testnet vs mainnet)
 
-```typescript
-// project.ts - Multi-network example
-const project: StellarProject = {
-  specVersion: '1.0.0',
-  // ... other config
-  network: {
-    // This will be overridden per deployment
-    chainId: 'Test SDF Network ; September 2015',
-  },
-  // Use a single datasource that works across networks
-  dataSources: [
-    {
-      kind: StellarDatasourceKind.Runtime,
-      startBlock: 1600000, // Can be overridden per deployment
-      mapping: {
-        file: './dist/index.js',
-        handlers: [/* your handlers */],
-      },
-    },
-  ],
-};
+Reference: [IPFS Publishing Guide - Multi-Network](https://subquery.network/doc/indexer/miscellaneous/ipfs.html#how-to-prepare-your-project)
+
+#### Multi-Manifest Pattern
+
+If you support multiple networks but share the same mapping and business logic, organize your project with multiple manifest files:
+
+```
+L projectRoot
+ L src/                          # Shared mapping logic
+ L package.json                  # Single package.json
+ L stellar-testnet.yaml          # Manifest for Stellar testnet
+ L stellar-mainnet.yaml          # Manifest for Stellar mainnet
+ L polkadot.yaml                 # Manifest for Polkadot (if supporting multiple chains)
+ L kusama.yaml                   # Manifest for Kusama (if supporting multiple chains)
+ ...
 ```
 
-**For Multiple Deployments:**
-- Deploy separate indexer instances for each network
-- Use different `chainId` values per deployment
-- Adjust `startBlock` per network requirements
-- Keep the same codebase for all networks
+#### Publishing Specific Networks
 
-**Future Networks:**
-```typescript
-// Testnet
-chainId: 'Test SDF Network ; September 2015'
+Publish each network separately with the appropriate manifest:
 
-// Mainnet  
-chainId: 'Public Global Stellar Network ; September 2015'
+```bash
+# Publish Stellar testnet version
+subql publish -f ~/projectRoot/stellar-testnet.yaml
 
-// Future Network
-chainId: 'Test SDF Future Network ; October 2022'
+# Publish Stellar mainnet version
+subql publish -f ~/projectRoot/stellar-mainnet.yaml
+
+# Publish Polkadot version (if multi-chain)
+subql publish -f ~/projectRoot/polkadot.yaml
 ```
+
+Each manifest gets a unique IPFS CID and can be deployed independently to the SubQuery Network.
+
+#### Our Current Setup
+
+**Currently**: This indexer is Stellar-specific with a single `project.ts` manifest.
+
+**For Stellar Testnet/Mainnet Support**: You can create:
+- `stellar-testnet.yaml` - Points to testnet with appropriate chainId and startBlock
+- `stellar-mainnet.yaml` - Points to mainnet with different chainId and startBlock
+- Both share the same `src/` directory and mapping logic
+
+**For Multi-Chain Support**: If you want to index access control on other chains (e.g., Polkadot, Ethereum), you would:
+1. Keep shared business logic in `src/`
+2. Create chain-specific manifest files
+3. Adjust handlers for chain-specific event types
+4. Publish each manifest separately
+
+#### Stellar Network Configurations
+
+When creating separate manifests for Stellar networks:
+
+```typescript
+// stellar-testnet.yaml
+network: {
+  chainId: 'Test SDF Network ; September 2015',
+  endpoint: ['https://horizon-testnet.stellar.org'],
+  sorobanEndpoint: 'https://soroban-testnet.stellar.org',
+}
+dataSources: [{
+  startBlock: 1600000, // Testnet start block
+  // ... shared handlers
+}]
+```
+
+```typescript
+// stellar-mainnet.yaml
+network: {
+  chainId: 'Public Global Stellar Network ; September 2015',
+  endpoint: ['https://horizon.stellar.org'],
+  sorobanEndpoint: 'https://soroban.stellar.org',
+}
+dataSources: [{
+  startBlock: 50000000, // Mainnet start block (adjust to recent block)
+  // ... same shared handlers
+}]
+```
+
+**Future Network:**
+```typescript
+chainId: 'Test SDF Future Network ; October 2022';
+```
+
+This pattern ensures:
+- Single codebase for all networks
+- Network-specific configuration per manifest
+- Independent IPFS publishing and deployment
+- Consistent business logic across all networks
 
 ---
 
@@ -135,6 +190,7 @@ ls -la dist/
 ```
 
 Expected output:
+
 ```
 dist/
 ├── index.js
@@ -190,6 +246,7 @@ subql publish --ipfs https://ipfs.subquery.network/ipfs/api/v0
 ```
 
 **Output Example:**
+
 ```
 Building and packing code... done
 Uploading to IPFS... done
@@ -238,18 +295,20 @@ schema:
 **Required Information:**
 
 1. **Project CID** (from Step 2.2)
+
    ```
    Example: QmZ4h7kJxFV4e9uM...
    ```
 
 2. **Project Name**
+
    ```
    stellar-access-control-indexer
    ```
 
 3. **Project Description**
    ```
-   SubQuery indexer for OpenZeppelin Stellar Access Control and Ownable contracts. 
+   SubQuery indexer for OpenZeppelin Stellar Access Control and Ownable contracts.
    Indexes role grants, revocations, and ownership transfers with full event history.
    ```
 
@@ -258,18 +317,20 @@ schema:
 Provide information that Node Operators and Consumers will find useful:
 
 **Project Information:**
+
 - **Logo/Image**: Upload OpenZeppelin logo or project icon
 - **Categories**: `DeFi`, `Access Control`, `Security`
 - **Website**: `https://openzeppelin.com` or your project URL
 - **Source Code**: `https://github.com/OpenZeppelin/stellar-access-control-indexer`
 
 **Deployment Details:**
+
 - **Version**: `1.0.0` (follow [semantic versioning](https://semver.org/))
 - **Deployment Description**:
   ```
-  Initial production release. Indexes AccessControl (RoleGranted, RoleRevoked, 
-  AdminTransferInitiated, AdminTransferCompleted) and Ownable events 
-  (OwnershipTransferStarted, OwnershipTransferCompleted) from OpenZeppelin 
+  Initial production release. Indexes AccessControl (RoleGranted, RoleRevoked,
+  AdminTransferInitiated, AdminTransferCompleted) and Ownable events
+  (OwnershipTransferStarted, OwnershipTransferCompleted) from OpenZeppelin
   Stellar contracts. Optimized for SubQuery Network with deterministic indexing.
   ```
 
@@ -306,12 +367,14 @@ After publishing, you'll be taken to your project management page:
 When you update your indexer:
 
 1. **Make Code Changes**
+
    ```bash
    # Update mappings, schema, etc.
    # Update version in package.json and project.ts
    ```
 
 2. **Build and Publish to IPFS**
+
    ```bash
    yarn build
    subql publish
@@ -319,6 +382,7 @@ When you update your indexer:
    ```
 
 3. **Deploy New Version in SubQuery UI**
+
    - Click **"Deploy New Version"**
    - Enter new deployment CID
    - Enter version number (e.g., `1.1.0`)
@@ -337,11 +401,13 @@ When you update your indexer:
 ### 4.3 Best Practices for Version Management
 
 **Version Numbering:**
+
 - **Major (x.0.0)**: Breaking changes (schema changes, handler logic changes)
 - **Minor (0.x.0)**: New features, new event handlers (backward compatible)
 - **Patch (0.0.x)**: Bug fixes, optimizations
 
 **Deployment Descriptions:**
+
 - Explain what changed
 - Note any migration steps for Node Operators
 - Indicate if upgrade is urgent or optional
@@ -404,7 +470,8 @@ export const stellarTestnet: StellarNetworkConfig = {
   horizonUrl: 'https://horizon-testnet.stellar.org',
   sorobanUrl: 'https://soroban-testnet.stellar.org',
   // SubQuery Network endpoint
-  indexerUri: 'https://api.subquery.network/sq/openzeppelin/stellar-access-control-indexer',
+  indexerUri:
+    'https://api.subquery.network/sq/openzeppelin/stellar-access-control-indexer',
   // ... other config
 };
 ```
@@ -425,6 +492,7 @@ Centralized but fully managed by SubQuery:
 4. Configure and deploy
 
 **Endpoint:**
+
 ```
 https://api.subquery.network/sq/YOUR_ORG/PROJECT_NAME
 ```
@@ -484,7 +552,7 @@ services:
       - --indexer=http://subquery-node:3000
     restart: always
     ports:
-      - "3000:3000"
+      - '3000:3000'
 
 volumes:
   postgres-data:
@@ -547,6 +615,7 @@ Adjust based on your endpoint capacity:
 ### SubQuery Network Dashboard
 
 The SubQuery Network provides:
+
 - **Real-time Indexing Metrics**: Block height, indexing speed
 - **Query Analytics**: Request volume, latency, errors
 - **Node Operator Status**: Which operators are serving your project
@@ -557,10 +626,12 @@ The SubQuery Network provides:
 For self-hosted deployments:
 
 1. **Prometheus + Grafana**
+
    - SubQuery exposes Prometheus metrics on `:3000/metrics`
    - Import SubQuery Grafana dashboards
 
 2. **Logging**
+
    - Configure log level: `--log-level=info`
    - Stream logs to CloudWatch, DataDog, or Elasticsearch
 
@@ -573,6 +644,7 @@ For self-hosted deployments:
 ## Deployment Checklist
 
 ### Pre-Deployment
+
 - [ ] Updated `@subql/cli` to latest version
 - [ ] Updated all SubQuery dependencies to latest
 - [ ] Build command is `subql build` in package.json
@@ -583,12 +655,14 @@ For self-hosted deployments:
 - [ ] Code committed and pushed to **public** GitHub repository
 
 ### IPFS Publishing
+
 - [ ] Ran `yarn build` before publishing
 - [ ] Successfully published to IPFS (`subql publish`)
 - [ ] Saved deployment CID
 - [ ] Verified IPFS upload with curl command
 
 ### SubQuery Network Deployment
+
 - [ ] Logged into SubQuery Explorer
 - [ ] Created new project with correct CID
 - [ ] Filled in project metadata (logo, description, categories)
@@ -597,6 +671,7 @@ For self-hosted deployments:
 - [ ] Node Operators are indexing (check dashboard)
 
 ### Post-Deployment
+
 - [ ] Obtained production GraphQL endpoint
 - [ ] Updated adapter configuration with indexer URI
 - [ ] Tested queries against production endpoint
@@ -605,6 +680,7 @@ For self-hosted deployments:
 - [ ] Monitoring/alerting configured (if self-hosted)
 
 ### For Production (Mainnet)
+
 - [ ] Private Horizon endpoint configured
 - [ ] Adjusted startBlock for mainnet (e.g., recent block)
 - [ ] Updated chainId to mainnet passphrase
@@ -621,6 +697,7 @@ For self-hosted deployments:
 **Error**: `Failed to upload to IPFS`
 
 **Solutions**:
+
 1. Ensure you ran `yarn build` first
 2. Check internet connectivity
 3. Try alternative IPFS endpoint:
@@ -634,6 +711,7 @@ For self-hosted deployments:
 **Error**: Node Operators not picking up project
 
 **Solutions**:
+
 1. Verify IPFS CID is correct
 2. Check `startBlock` is valid and not in the future
 3. Ensure network `chainId` matches target network
@@ -645,6 +723,7 @@ For self-hosted deployments:
 **Error**: `Proof of Indexing mismatch between operators`
 
 **Solutions**:
+
 1. Remove any `Promise.all()` that doesn't guarantee order
 2. Don't use `new Date()` - use `event.ledgerClosedAt`
 3. Avoid external API calls in mapping handlers
@@ -656,6 +735,7 @@ For self-hosted deployments:
 **Error**: `Request failed with status code 429`
 
 **Solutions**:
+
 1. **Immediate**: Reduce `--batch-size` and `--workers`
 2. **Short-term**: Wait for rate limits to reset (1-2 minutes)
 3. **Long-term**: Use private Horizon endpoint (mandatory for production)
@@ -670,57 +750,211 @@ For self-hosted deployments:
 
 ## Multi-Network Deployment Strategy
 
-To support both testnet and mainnet:
+SubQuery supports indexing multiple blockchain networks with shared business logic. This section covers both:
+1. **Multi-chain support** (Stellar, Polkadot, Ethereum, etc.)
+2. **Same chain, different networks** (Stellar testnet vs mainnet)
 
-### 1. Maintain Single Codebase
+Reference: [Multi-Network Projects](https://subquery.network/doc/indexer/miscellaneous/ipfs.html#how-to-prepare-your-project)
 
-Keep one repository with network-agnostic code:
+### Strategy 1: Multiple Manifests (Recommended)
+
+The best approach is using multiple manifest files with a single codebase:
+
+```
+projectRoot/
+├── src/
+│   └── mappings/
+│       └── mappingHandlers.ts      # Shared logic
+├── package.json                    # Single package.json
+├── schema.graphql                  # Shared schema
+├── stellar-testnet.yaml            # Stellar testnet manifest
+├── stellar-mainnet.yaml            # Stellar mainnet manifest
+├── polkadot.yaml                   # Polkadot manifest (if multi-chain)
+└── kusama.yaml                     # Kusama manifest (if multi-chain)
+```
+
+#### Example: Stellar Testnet Manifest
+
+```yaml
+# stellar-testnet.yaml
+specVersion: 1.0.0
+name: stellar-access-control-indexer-testnet
+version: 1.0.0
+runner:
+  node:
+    name: '@subql/node-stellar'
+    version: '*'
+  query:
+    name: '@subql/query'
+    version: '*'
+network:
+  chainId: 'Test SDF Network ; September 2015'
+  endpoint: ['https://horizon-testnet.stellar.org']
+  sorobanEndpoint: 'https://soroban-testnet.stellar.org'
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: stellar/Runtime
+    startBlock: 1600000
+    mapping:
+      file: ./dist/index.js
+      handlers:
+        - handler: handleRoleGranted
+          kind: stellar/EventHandler
+          filter:
+            topics: ['RoleGranted']
+        # ... other handlers
+```
+
+#### Example: Stellar Mainnet Manifest
+
+```yaml
+# stellar-mainnet.yaml
+specVersion: 1.0.0
+name: stellar-access-control-indexer-mainnet  # Different name
+version: 1.0.0
+runner:
+  node:
+    name: '@subql/node-stellar'
+    version: '*'
+  query:
+    name: '@subql/query'
+    version: '*'
+network:
+  chainId: 'Public Global Stellar Network ; September 2015'  # Different chainId
+  endpoint: ['https://horizon.stellar.org']
+  sorobanEndpoint: 'https://soroban.stellar.org'
+schema:
+  file: ./schema.graphql  # Same schema
+dataSources:
+  - kind: stellar/Runtime
+    startBlock: 50000000  # Different startBlock for mainnet
+    mapping:
+      file: ./dist/index.js  # Same compiled code
+      handlers:
+        - handler: handleRoleGranted
+          kind: stellar/EventHandler
+          filter:
+            topics: ['RoleGranted']
+        # ... same handlers
+```
+
+### Publishing Each Network
+
+```bash
+# Build once (shared code)
+yarn build
+
+# Publish testnet
+subql publish -f ~/projectRoot/stellar-testnet.yaml
+# Output: QmTestnetCID...
+
+# Publish mainnet
+subql publish -f ~/projectRoot/stellar-mainnet.yaml
+# Output: QmMainnetCID...
+
+# If supporting multiple chains, publish each:
+subql publish -f ~/projectRoot/polkadot.yaml
+subql publish -f ~/projectRoot/kusama.yaml
+```
+
+**Important**: Each manifest gets a unique IPFS CID and is deployed independently to SubQuery Network.
+
+### Strategy 2: Single Manifest with Deployment Overrides
+
+For simpler cases (same chain, different networks), you can use a single `project.ts` and override settings during deployment:
 
 ```typescript
 // project.ts - Base configuration
 const project: StellarProject = {
   specVersion: '1.0.0',
   name: 'stellar-access-control-indexer',
-  // Network will be specified per deployment
-  // ...
+  // ... other config
+  network: {
+    chainId: 'Test SDF Network ; September 2015', // Default to testnet
+  },
 };
 ```
 
-### 2. Deploy Separate Instances
+Then deploy twice with different configurations in SubQuery UI.
+
+**Note**: The multi-manifest approach (Strategy 1) is more explicit and maintainable.
+
+### Deployment Configuration Per Network
 
 **Testnet Deployment:**
-```bash
-# Publish testnet version
-yarn build
-subql publish
-# Deploy with chainId: 'Test SDF Network ; September 2015'
-```
+
+- **Name**: `stellar-access-control-indexer-testnet`
+- **CID**: From `subql publish -f stellar-testnet.yaml`
+- **Endpoint**: `https://api.subquery.network/sq/openzeppelin/stellar-access-control-indexer-testnet`
 
 **Mainnet Deployment:**
-```bash
-# Same code, different network config
-yarn build
-subql publish
-# Deploy with chainId: 'Public Global Stellar Network ; September 2015'
-```
 
-### 3. Use Different Endpoints
+- **Name**: `stellar-access-control-indexer-mainnet`
+- **CID**: From `subql publish -f stellar-mainnet.yaml`
+- **Endpoint**: `https://api.subquery.network/sq/openzeppelin/stellar-access-control-indexer-mainnet`
+
+### Adapter Configuration
+
+Update your adapter to support both networks:
 
 ```typescript
-// Testnet adapter config
-indexerUri: 'https://api.subquery.network/sq/openzeppelin/stellar-access-control-indexer-testnet'
+// contracts-ui-builder/packages/adapter-stellar/src/networks/
 
-// Mainnet adapter config  
-indexerUri: 'https://api.subquery.network/sq/openzeppelin/stellar-access-control-indexer-mainnet'
+export const stellarTestnet: StellarNetworkConfig = {
+  id: 'stellar-testnet',
+  name: 'Stellar Testnet',
+  chainId: 'Test SDF Network ; September 2015',
+  horizonUrl: 'https://horizon-testnet.stellar.org',
+  sorobanUrl: 'https://soroban-testnet.stellar.org',
+  indexerUri:
+    'https://api.subquery.network/sq/openzeppelin/stellar-access-control-indexer-testnet',
+  // ... other config
+};
+
+export const stellarMainnet: StellarNetworkConfig = {
+  id: 'stellar-mainnet',
+  name: 'Stellar Mainnet',
+  chainId: 'Public Global Stellar Network ; September 2015',
+  horizonUrl: 'https://horizon.stellar.org',
+  sorobanUrl: 'https://soroban.stellar.org',
+  indexerUri:
+    'https://api.subquery.network/sq/openzeppelin/stellar-access-control-indexer-mainnet',
+  // ... other config
+};
 ```
 
-### 4. Version Synchronization
+### Version Synchronization
 
 Keep versions synchronized across networks:
+
 - Deploy v1.0.0 to both testnet and mainnet
 - Test on testnet first
 - Promote to mainnet after validation
 - Use same version numbers for consistency
+- Update both networks when fixing bugs or adding features
+
+### Multi-Chain Considerations (Beyond Stellar)
+
+If you want to support other blockchains (Polkadot, Ethereum, Cosmos) with similar access control patterns:
+
+1. **Shared Logic**: Keep common access control logic in `src/`
+2. **Chain-Specific Handlers**: Adjust event types per chain
+3. **Separate Manifests**: Create manifest per chain
+4. **Dependencies**: Add chain-specific packages:
+   ```json
+   {
+     "dependencies": {
+       "@subql/types-stellar": "latest",
+       "@subql/types-ethereum": "latest",  // If supporting Ethereum
+       "@subql/types": "latest"
+     }
+   }
+   ```
+5. **Conditional Logic**: Use network detection in mappings if needed
+6. **Independent Deployment**: Each chain is a separate SubQuery project
+
+This approach maximizes code reuse while maintaining chain-specific optimizations.
 
 ---
 
@@ -765,16 +999,19 @@ Keep versions synchronized across networks:
 ## Support and Resources
 
 ### Documentation
+
 - [SubQuery Network Documentation](https://subquery.network/doc/subquery_network/architects/publish.html)
 - [IPFS Publishing Guide](https://subquery.network/doc/indexer/miscellaneous/ipfs.html)
 - [SubQuery Academy](https://academy.subquery.network)
 
 ### Community
+
 - [SubQuery Discord](https://discord.gg/subquery) - Get help from the community
 - [GitHub Discussions](https://github.com/subquery/subql/discussions)
 - [SubQuery Forum](https://forum.subquery.network)
 
 ### Project-Specific
+
 - [OpenZeppelin Stellar Contracts](https://github.com/OpenZeppelin/stellar-contracts)
 - [Indexer GitHub Issues](https://github.com/OpenZeppelin/stellar-access-control-indexer/issues)
 
