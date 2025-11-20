@@ -36,39 +36,38 @@ import {
   ContractType,
 } from '../types';
 import { StellarOperation, SorobanEvent } from '@subql/types-stellar';
-import { xdr, StrKey } from '@stellar/stellar-base';
+import { scValToNative } from '@stellar/stellar-base';
 
 /**
- * Handler for RoleGranted events
- * Definition: fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, caller: &Address)
- * Topics: ["RoleGranted", role, account]
- * Data: [caller]
+ * Handler for RoleGranted events from Access Control contracts
+ * Event signature: role_granted(role: Symbol, account: Address, caller: Address)
+ * Topics: ["role_granted", role, account]
+ * Data: { caller: Address } (wrapped in a Map structure)
  */
 export async function handleRoleGranted(event: SorobanEvent): Promise<void> {
   logger.info(
     `Processing RoleGranted event at ledger ${event.ledger!.sequence}`
   );
 
-  // Extract event topics (EventName, Role, Account)
-  // Note: topic[0] is the event name
-  const roleScVal = event.topic[1];
-  const accountScVal = event.topic[2];
-
-  // Extract caller from data (event value)
-  // Based on OZ implementation: RoleGranted { ... }.publish(e) emits a struct.
-  // Structs in events:
-  // - Topics are the fields marked #[topic]
-  // - Data is a Vec containing the non-topic fields in order
-  const senderScVal = event.value;
-
+  // Extract and decode event data using scValToNative
   const contractAddress = event.contractId?.contractId().toString()!;
-  const role = scValToString(roleScVal);
-  const account = decodeAddress(accountScVal);
+  const role = scValToNative(event.topic[1]) as string;
+  const account = scValToNative(event.topic[2]) as string;
 
-  // Decode sender from the data struct/vec
+  // The event.value can be either a direct Address or a Map/Struct with 'caller' field
   let sender: string | undefined;
-  if (senderScVal) {
-    sender = decodeAddress(senderScVal);
+  if (event.value) {
+    const decodedValue = scValToNative(event.value);
+    // Check if it's an object with 'caller' field or a direct string
+    if (
+      typeof decodedValue === 'object' &&
+      decodedValue !== null &&
+      'caller' in decodedValue
+    ) {
+      sender = (decodedValue as { caller: string }).caller;
+    } else if (typeof decodedValue === 'string') {
+      sender = decodedValue;
+    }
   }
 
   // Create event record
@@ -109,28 +108,35 @@ export async function handleRoleGranted(event: SorobanEvent): Promise<void> {
 }
 
 /**
- * Handler for RoleRevoked events
- * Definition: fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, caller: &Address)
- * Topics: ["RoleRevoked", role, account]
- * Data: [caller]
+ * Handler for RoleRevoked events from Access Control contracts
+ * Event signature: role_revoked(role: Symbol, account: Address, caller: Address)
+ * Topics: ["role_revoked", role, account]
+ * Data: { caller: Address } (wrapped in a Map structure)
  */
 export async function handleRoleRevoked(event: SorobanEvent): Promise<void> {
   logger.info(
     `Processing RoleRevoked event at ledger ${event.ledger!.sequence}`
   );
 
-  // Extract event topics (EventName, Role, Account)
-  const roleScVal = event.topic[1];
-  const accountScVal = event.topic[2];
-  const senderScVal = event.value;
-
+  // Extract and decode event data using scValToNative
   const contractAddress = event.contractId?.contractId().toString()!;
-  const role = scValToString(roleScVal);
-  const account = decodeAddress(accountScVal);
+  const role = scValToNative(event.topic[1]) as string;
+  const account = scValToNative(event.topic[2]) as string;
 
+  // The event.value can be either a direct Address or a Map/Struct with 'caller' field
   let sender: string | undefined;
-  if (senderScVal) {
-    sender = decodeAddress(senderScVal);
+  if (event.value) {
+    const decodedValue = scValToNative(event.value);
+    // Check if it's an object with 'caller' field or a direct string
+    if (
+      typeof decodedValue === 'object' &&
+      decodedValue !== null &&
+      'caller' in decodedValue
+    ) {
+      sender = (decodedValue as { caller: string }).caller;
+    } else if (typeof decodedValue === 'string') {
+      sender = decodedValue;
+    }
   }
 
   // Create event record
@@ -178,20 +184,14 @@ export async function handleAdminTransferInitiated(
   );
 
   const contractAddress = event.contractId?.contractId().toString()!;
-  // In the OZ implementation, the struct fields are in the data
-  const eventData = event.value;
-  
-  // The data should be a Vec with [new_admin, previous_admin]
-  let newAdmin: string | undefined;
-  let previousAdmin: string | undefined;
-  
-  if (eventData && eventData.vec) {
-    const vecElements = eventData.vec();
-    if (vecElements && vecElements.length >= 2) {
-      newAdmin = decodeAddress(vecElements[0]);
-      previousAdmin = decodeAddress(vecElements[1]);
-    }
-  }
+
+  // current_admin is in topic[1]
+  const currentAdmin = scValToNative(event.topic[1]) as string;
+
+  // The event.value contains new_admin and live_until_ledger
+  const eventData = scValToNative(event.value) as Record<string, unknown>;
+  const newAdmin = eventData.new_admin as string;
+  const liveUntilLedger = eventData.live_until_ledger as number;
 
   // Create event record
   const eventId = `${event.id}-admin-init`;
@@ -199,8 +199,8 @@ export async function handleAdminTransferInitiated(
     id: eventId,
     contract: contractAddress,
     role: undefined,
-    account: newAdmin || 'unknown',
-    admin: previousAdmin,
+    account: newAdmin, // The new admin receiving the role
+    admin: currentAdmin, // The current admin initiating transfer
     type: EventType.ADMIN_TRANSFER_INITIATED,
     blockHeight: BigInt(event.ledger!.sequence),
     timestamp: new Date(event.ledgerClosedAt),
@@ -213,9 +213,9 @@ export async function handleAdminTransferInitiated(
 
 /**
  * Handler for AdminTransferCompleted events
- * Definition: fn emit_admin_transfer_completed(e: &Env, new_admin: &Address, previous_admin: &Address)
- * Topics: ["AdminTransferCompleted"]
- * Data: struct { new_admin: Address, previous_admin: Address }
+ * Event signature: AdminTransferCompleted { new_admin: Address (topic), previous_admin: Address }
+ * Topics: ["admin_transfer_completed", new_admin]
+ * Data: { previous_admin: Address }
  */
 export async function handleAdminTransferCompleted(
   event: SorobanEvent
@@ -227,20 +227,13 @@ export async function handleAdminTransferCompleted(
   );
 
   const contractAddress = event.contractId?.contractId().toString()!;
-  // In the OZ implementation, the struct fields are in the data
-  const eventData = event.value;
-  
-  // The data should be a Vec with [new_admin, previous_admin]
-  let newAdmin: string | undefined;
-  let previousAdmin: string | undefined;
-  
-  if (eventData && eventData.vec) {
-    const vecElements = eventData.vec();
-    if (vecElements && vecElements.length >= 2) {
-      newAdmin = decodeAddress(vecElements[0]);
-      previousAdmin = decodeAddress(vecElements[1]);
-    }
-  }
+
+  // new_admin is in topic[1]
+  const newAdmin = scValToNative(event.topic[1]) as string;
+
+  // The event.value contains previous_admin
+  const eventData = scValToNative(event.value) as Record<string, unknown>;
+  const previousAdmin = eventData.previous_admin as string;
 
   // Create event record
   const eventId = `${event.id}-admin-complete`;
@@ -248,7 +241,7 @@ export async function handleAdminTransferCompleted(
     id: eventId,
     contract: contractAddress,
     role: undefined,
-    account: newAdmin || 'unknown',
+    account: newAdmin,
     admin: previousAdmin,
     type: EventType.ADMIN_TRANSFER_COMPLETED,
     blockHeight: BigInt(event.ledger!.sequence),
@@ -269,9 +262,9 @@ export async function handleAdminTransferCompleted(
 
 /**
  * Handler for OwnershipTransferStarted events
- * Definition: fn emit_ownership_transfer_started(e: &Env, new_owner: &Address, previous_owner: &Address)
- * Topics: ["OwnershipTransferStarted"]
- * Data: struct { new_owner: Address, previous_owner: Address }
+ * Event signature: OwnershipTransfer { old_owner: Address, new_owner: Address, live_until_ledger: u32 }
+ * Topics: ["ownership_transfer"]
+ * Data: struct/map with old_owner, new_owner, live_until_ledger fields
  */
 export async function handleOwnershipTransferStarted(
   event: SorobanEvent
@@ -283,19 +276,27 @@ export async function handleOwnershipTransferStarted(
   );
 
   const contractAddress = event.contractId?.contractId().toString()!;
-  // In the OZ implementation, the struct fields are in the data
-  const eventData = event.value;
-  
-  // The data should be a Vec with [new_owner, previous_owner]
-  let newOwner: string | undefined;
-  let previousOwner: string | undefined;
-  
-  if (eventData && eventData.vec) {
-    const vecElements = eventData.vec();
-    if (vecElements && vecElements.length >= 2) {
-      newOwner = decodeAddress(vecElements[0]);
-      previousOwner = decodeAddress(vecElements[1]);
-    }
+
+  // The event.value is a struct/map with old_owner, new_owner, live_until_ledger
+  const eventData = scValToNative(event.value);
+  logger.info(`OwnershipTransfer eventData: ${JSON.stringify(eventData)}`);
+
+  let oldOwner: string;
+  let newOwner: string;
+
+  if (eventData && typeof eventData === 'object' && !Array.isArray(eventData)) {
+    const dataObj = eventData as Record<string, unknown>;
+    oldOwner = dataObj.old_owner as string;
+    newOwner = dataObj.new_owner as string;
+  } else {
+    logger.error(
+      `Unexpected eventData structure for OwnershipTransferStarted: ${JSON.stringify(
+        eventData
+      )}`
+    );
+    throw new Error(
+      `Invalid event data structure at ledger ${event.ledger!.sequence}`
+    );
   }
 
   // Create event record
@@ -304,8 +305,8 @@ export async function handleOwnershipTransferStarted(
     id: eventId,
     contract: contractAddress,
     role: undefined,
-    account: newOwner || 'unknown',
-    admin: previousOwner,
+    account: newOwner, // The new owner receiving ownership
+    admin: oldOwner, // The current owner transferring ownership
     type: EventType.OWNERSHIP_TRANSFER_STARTED,
     blockHeight: BigInt(event.ledger!.sequence),
     timestamp: new Date(event.ledgerClosedAt),
@@ -317,10 +318,10 @@ export async function handleOwnershipTransferStarted(
 }
 
 /**
- * Handler for OwnershipTransferCompleted events
- * Definition: fn emit_ownership_transfer_completed(e: &Env, new_owner: &Address)
- * Topics: ["OwnershipTransferCompleted"]
- * Data: [new_owner]
+ * Handler for OwnershipTransferCompleted events from Ownable contracts
+ * Event signature: ownership_transfer_completed(new_owner: Address)
+ * Topics: ["ownership_transfer_completed"]
+ * Data: { new_owner: Address } (struct/map)
  */
 export async function handleOwnershipTransferCompleted(
   event: SorobanEvent
@@ -331,17 +332,14 @@ export async function handleOwnershipTransferCompleted(
     }`
   );
 
-  // Topics: ["OwnershipTransferCompleted"]
-  // Data: struct { new_owner: Address }
-  // Actually, in `emit_ownership_transfer_completed`:
-  // OwnershipTransferCompleted { new_owner: ... }.publish(e)
-  // No #[topic] on new_owner means it's in data.
-
   const contractAddress = event.contractId?.contractId().toString()!;
-  const newOwnerScVal = event.value;
-  const newOwner = decodeAddress(newOwnerScVal);
 
-  // We don't have previous owner in this event
+  // The event.value is a struct (Map) containing { new_owner: Address }
+  // scValToNative automatically converts Maps to JS objects
+  const eventData = scValToNative(event.value) as Record<string, unknown>;
+  const newOwner = eventData.new_owner as string;
+
+  // Previous owner is not available in this event
   const previousOwner = undefined;
 
   // Create event record
@@ -377,6 +375,189 @@ export async function handleOwnershipTransferCompleted(
   );
 
   await Promise.all([accessEvent.save(), ownership.save()]);
+}
+
+/**
+ * Handler for OwnershipRenounced events from Ownable contracts
+ * Event signature: ownership_renounced(old_owner: Address)
+ * Topics: ["ownership_renounced"] (old_owner may be in topic[1] or event.value depending on contract version)
+ * Data: old_owner (Address) or empty
+ */
+export async function handleOwnershipRenounced(
+  event: SorobanEvent
+): Promise<void> {
+  logger.info(
+    `Processing OwnershipRenounced event at ledger ${event.ledger!.sequence}`
+  );
+
+  const contractAddress = event.contractId?.contractId().toString()!;
+
+  // old_owner should be in topic[1], but check event.value as fallback
+  let oldOwner: string;
+  if (event.topic[1]) {
+    oldOwner = scValToNative(event.topic[1]) as string;
+  } else if (event.value) {
+    const eventData = scValToNative(event.value);
+    if (typeof eventData === 'string') {
+      oldOwner = eventData;
+    } else if (eventData && typeof eventData === 'object') {
+      oldOwner = (eventData as Record<string, unknown>).old_owner as string;
+    } else {
+      logger.error(
+        `Cannot extract old_owner from OwnershipRenounced event at ledger ${
+          event.ledger!.sequence
+        }`
+      );
+      throw new Error(`Invalid event structure`);
+    }
+  } else {
+    logger.error(
+      `No topic[1] or value in OwnershipRenounced event at ledger ${
+        event.ledger!.sequence
+      }`
+    );
+    throw new Error(`Invalid event structure`);
+  }
+
+  // Create event record
+  const eventId = `${event.id}-ownership-renounced`;
+  const accessEvent = AccessControlEvent.create({
+    id: eventId,
+    contract: contractAddress,
+    role: undefined,
+    account: oldOwner,
+    admin: undefined,
+    type: EventType.OWNERSHIP_RENOUNCED,
+    blockHeight: BigInt(event.ledger!.sequence),
+    timestamp: new Date(event.ledgerClosedAt),
+    txHash: event.transaction?.hash || 'unknown',
+    ledger: event.ledger!.sequence,
+  });
+
+  // Remove ownership record
+  await ContractOwnership.remove(contractAddress);
+
+  // Update contract metadata
+  await updateContractMetadata(
+    contractAddress,
+    ContractType.OWNABLE,
+    new Date(event.ledgerClosedAt)
+  );
+
+  await accessEvent.save();
+}
+
+/**
+ * Handler for AdminRenounced events from Access Control contracts
+ * Event signature: admin_renounced(admin: Address)
+ * Topics: ["admin_renounced"] (admin may be in topic[1] or event.value depending on contract version)
+ * Data: admin (Address) or empty
+ */
+export async function handleAdminRenounced(event: SorobanEvent): Promise<void> {
+  logger.info(
+    `Processing AdminRenounced event at ledger ${event.ledger!.sequence}`
+  );
+
+  const contractAddress = event.contractId?.contractId().toString()!;
+
+  // admin should be in topic[1], but check event.value as fallback
+  let admin: string;
+  if (event.topic[1]) {
+    admin = scValToNative(event.topic[1]) as string;
+  } else if (event.value) {
+    const eventData = scValToNative(event.value);
+    if (typeof eventData === 'string') {
+      admin = eventData;
+    } else if (eventData && typeof eventData === 'object') {
+      admin = (eventData as Record<string, unknown>).admin as string;
+    } else {
+      logger.error(
+        `Cannot extract admin from AdminRenounced event at ledger ${
+          event.ledger!.sequence
+        }`
+      );
+      throw new Error(`Invalid event structure`);
+    }
+  } else {
+    logger.error(
+      `No topic[1] or value in AdminRenounced event at ledger ${
+        event.ledger!.sequence
+      }`
+    );
+    throw new Error(`Invalid event structure`);
+  }
+
+  // Create event record
+  const eventId = `${event.id}-admin-renounced`;
+  const accessEvent = AccessControlEvent.create({
+    id: eventId,
+    contract: contractAddress,
+    role: undefined,
+    account: admin,
+    admin: undefined,
+    type: EventType.ADMIN_RENOUNCED,
+    blockHeight: BigInt(event.ledger!.sequence),
+    timestamp: new Date(event.ledgerClosedAt),
+    txHash: event.transaction?.hash || 'unknown',
+    ledger: event.ledger!.sequence,
+  });
+
+  // Update contract metadata
+  await updateContractMetadata(
+    contractAddress,
+    ContractType.ACCESS_CONTROL,
+    new Date(event.ledgerClosedAt)
+  );
+
+  await accessEvent.save();
+}
+
+/**
+ * Handler for RoleAdminChanged events from Access Control contracts
+ * Event signature: role_admin_changed(role: Symbol, previous_admin_role: Symbol, new_admin_role: Symbol)
+ * Topics: ["role_admin_changed", role: Symbol]
+ * Data: { previous_admin_role: Symbol, new_admin_role: Symbol }
+ */
+export async function handleRoleAdminChanged(
+  event: SorobanEvent
+): Promise<void> {
+  logger.info(
+    `Processing RoleAdminChanged event at ledger ${event.ledger!.sequence}`
+  );
+
+  const contractAddress = event.contractId?.contractId().toString()!;
+
+  // role is in topic[1]
+  const role = scValToNative(event.topic[1]) as string;
+
+  // previous_admin_role and new_admin_role are in event.value (data)
+  const eventData = scValToNative(event.value) as Record<string, unknown>;
+  const previousAdminRole = eventData.previous_admin_role as string;
+  const newAdminRole = eventData.new_admin_role as string;
+
+  // Create event record
+  const eventId = `${event.id}-role-admin-changed`;
+  const accessEvent = AccessControlEvent.create({
+    id: eventId,
+    contract: contractAddress,
+    role: role,
+    account: newAdminRole, // Use new admin role as account for tracking
+    admin: previousAdminRole, // Use previous admin role as admin for reference
+    type: EventType.ROLE_ADMIN_CHANGED,
+    blockHeight: BigInt(event.ledger!.sequence),
+    timestamp: new Date(event.ledgerClosedAt),
+    txHash: event.transaction?.hash || 'unknown',
+    ledger: event.ledger!.sequence,
+  });
+
+  // Update contract metadata
+  await updateContractMetadata(
+    contractAddress,
+    ContractType.ACCESS_CONTROL,
+    new Date(event.ledgerClosedAt)
+  );
+
+  await accessEvent.save();
 }
 
 /**
@@ -436,56 +617,4 @@ async function updateContractMetadata(
   }
 
   await contract.save();
-}
-
-/**
- * Helper function to decode Stellar addresses from ScVal
- */
-function decodeAddress(scVal: xdr.ScVal): string {
-  try {
-    const addressObj = scVal.address();
-
-    switch (addressObj.switch()) {
-      case xdr.ScAddressType.scAddressTypeAccount():
-        // Decode account address
-        const accountId = addressObj.accountId();
-        return StrKey.encodeEd25519PublicKey(accountId.ed25519());
-
-      case xdr.ScAddressType.scAddressTypeContract():
-        // Decode contract address
-        const contractId = addressObj.contractId();
-        // Convert Hash (which is an array) to Buffer
-        return StrKey.encodeContract(Buffer.from(contractId as any));
-
-      default:
-        logger.error(`Unknown address type: ${addressObj.switch()}`);
-        return 'unknown';
-    }
-  } catch (e) {
-    logger.error(`Failed to decode address: ${e}`);
-    return 'unknown';
-  }
-}
-
-/**
- * Helper function to convert ScVal to string
- */
-function scValToString(scVal: xdr.ScVal): string {
-  try {
-    // Handle different ScVal types
-    switch (scVal.switch()) {
-      case xdr.ScValType.scvSymbol():
-        return scVal.sym().toString();
-      case xdr.ScValType.scvString():
-        return scVal.str().toString();
-      case xdr.ScValType.scvBytes():
-        return scVal.bytes().toString('hex');
-      default:
-        // For other types, convert to string representation
-        return scVal.toString();
-    }
-  } catch (e) {
-    logger.error(`Failed to convert ScVal to string: ${e}`);
-    return 'unknown';
-  }
 }

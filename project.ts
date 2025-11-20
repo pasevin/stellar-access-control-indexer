@@ -3,8 +3,9 @@ import {
   StellarHandlerKind,
   StellarProject,
 } from '@subql/types-stellar';
+import { Horizon } from '@stellar/stellar-sdk';
 
-/* OpenZeppelin Stellar Access Control Indexer Configuration */
+/* This is your project configuration */
 const project: StellarProject = {
   specVersion: '1.0.0',
   name: 'stellar-access-control-indexer',
@@ -26,28 +27,24 @@ const project: StellarProject = {
     file: './schema.graphql',
   },
   network: {
-    /* Stellar and Soroban uses the network passphrase as the chainId
-      'Test SDF Network ; September 2015' for testnet
-      'Public Global Stellar Network ; September 2015' for mainnet
-      'Test SDF Future Network ; October 2022' for Future Network */
+    /* The genesis hash of the network (hash of block 1) */
     chainId: 'Test SDF Network ; September 2015',
     /**
-     * Multiple endpoints for better reliability and rate limit handling
+     * These endpoint(s) should be public non-pruned archive node
      * Public nodes may be rate limited, which can affect indexing speed
      * When developing your project we suggest getting a private API key
-     * If you use a rate limited endpoint, adjust the --batch-size and --workers parameters
-     * These settings can be found in your docker-compose.yaml
+     * You can get them from OnFinality for free https://app.onfinality.io
      */
     endpoint: ['https://horizon-testnet.stellar.org'],
     /* This is a specific Soroban endpoint
-      It is only required when you are using a soroban/EventHandler */
+     * It is required for Soroban projects
+     */
     sorobanEndpoint: 'https://soroban-testnet.stellar.org',
   },
   dataSources: [
     {
       kind: StellarDatasourceKind.Runtime,
-      /* Start from recent block - approximately 2 weeks ago to ensure data availability */
-      startBlock: 1600000,
+      startBlock: 1685700,
       mapping: {
         file: './dist/index.js',
         handlers: [
@@ -56,28 +53,64 @@ const project: StellarProject = {
             handler: 'handleRoleGranted',
             kind: StellarHandlerKind.Event,
             filter: {
-              /* RoleGranted(role: Symbol, account: Address, caller: Address)
-                 Topics: ["RoleGranted", role, account] */
-              topics: ['RoleGranted'],
+              topics: ['role_granted'],
             },
           },
           {
             handler: 'handleRoleRevoked',
             kind: StellarHandlerKind.Event,
             filter: {
-              /* RoleRevoked(role: Symbol, account: Address, caller: Address)
-                 Topics: ["RoleRevoked", role, account] */
-              topics: ['RoleRevoked'],
+              topics: ['role_revoked'],
+            },
+          },
+          {
+            handler: 'handleAdminTransferInitiated',
+            kind: StellarHandlerKind.Event,
+            filter: {
+              topics: ['admin_transfer_initiated'],
+            },
+          },
+          {
+            handler: 'handleAdminTransferCompleted',
+            kind: StellarHandlerKind.Event,
+            filter: {
+              topics: ['admin_transfer_completed'],
+            },
+          },
+          {
+            handler: 'handleAdminRenounced',
+            kind: StellarHandlerKind.Event,
+            filter: {
+              topics: ['admin_renounced'],
+            },
+          },
+          {
+            handler: 'handleRoleAdminChanged',
+            kind: StellarHandlerKind.Event,
+            filter: {
+              topics: ['role_admin_changed'],
             },
           },
           /* Ownable Events */
           {
+            handler: 'handleOwnershipTransferStarted',
+            kind: StellarHandlerKind.Event,
+            filter: {
+              topics: ['ownership_transfer'],
+            },
+          },
+          {
             handler: 'handleOwnershipTransferCompleted',
             kind: StellarHandlerKind.Event,
             filter: {
-              /* OwnershipTransferCompleted(new_owner: Address)
-                 Topics: ["OwnershipTransferCompleted"] */
-              topics: ['OwnershipTransferCompleted'],
+              topics: ['ownership_transfer_completed'],
+            },
+          },
+          {
+            handler: 'handleOwnershipRenounced',
+            kind: StellarHandlerKind.Event,
+            filter: {
+              topics: ['ownership_renounced'],
             },
           },
           /* Optional: Contract deployment tracking */
@@ -85,9 +118,6 @@ const project: StellarProject = {
             handler: 'handleContractDeployment',
             kind: StellarHandlerKind.Operation,
             filter: {
-              /* Track contract creation operations via Host Function Invocation
-                 Using 'invokeHostFunction' (camelCase) as per Horizon API
-                 Type assertion needed due to incomplete SubQuery type definitions */
               type: 'invokeHostFunction' as any,
             },
           },
@@ -97,5 +127,5 @@ const project: StellarProject = {
   ],
 };
 
-// Must set default to the project instance
+// Can expand the Datasource processor types via the generic param
 export default project;

@@ -79,6 +79,7 @@ Reference: [GraphQL Subscriptions](https://subquery.network/doc/indexer/run_publ
 ### 5. Multi-Network/Multi-Chain Support (Optional but Recommended)
 
 SubQuery supports indexing multiple blockchain networks with shared business logic and a single codebase. This is useful for:
+
 - **Different chains** (Stellar, Polkadot, Ethereum, Cosmos, etc.)
 - **Same chain, different networks** (Stellar testnet vs mainnet)
 
@@ -121,11 +122,13 @@ Each manifest gets a unique IPFS CID and can be deployed independently to the Su
 **Currently**: This indexer is Stellar-specific with a single `project.ts` manifest.
 
 **For Stellar Testnet/Mainnet Support**: You can create:
+
 - `stellar-testnet.yaml` - Points to testnet with appropriate chainId and startBlock
 - `stellar-mainnet.yaml` - Points to mainnet with different chainId and startBlock
 - Both share the same `src/` directory and mapping logic
 
 **For Multi-Chain Support**: If you want to index access control on other chains (e.g., Polkadot, Ethereum), you would:
+
 1. Keep shared business logic in `src/`
 2. Create chain-specific manifest files
 3. Adjust handlers for chain-specific event types
@@ -162,11 +165,13 @@ dataSources: [{
 ```
 
 **Future Network:**
+
 ```typescript
 chainId: 'Test SDF Future Network ; October 2022';
 ```
 
 This pattern ensures:
+
 - Single codebase for all networks
 - Network-specific configuration per manifest
 - Independent IPFS publishing and deployment
@@ -266,12 +271,14 @@ You should see your project configuration with IPFS references:
 
 ```yaml
 dataSources:
-  - kind: substrate/Runtime
+  - kind: stellar/Runtime
     mapping:
       file: ipfs://QmTTJKrMVzCZqmRCd5xKHbKymtQQnHZierBMHLtHHGyjLy
       handlers:
         - handler: handleRoleGranted
-          kind: substrate/EventHandler
+          kind: stellar/EventHandler
+          filter:
+            topics: ['role_granted']
 schema:
   file: ipfs://QmTP5BjtxETVqvU4MkRxmgf8NbceB17WtydS6oQeHBCyjz
 ```
@@ -284,11 +291,12 @@ schema:
 
 ### 3.1 Access SubQuery Explorer
 
-1. Visit [SubQuery Explorer](https://project.subquery.network)
-2. Connect your GitHub account
-3. Click **"Publish New Project"**
+1. Visit [SubQuery Explorer](https://app.subquery.network)
+2. Connect your wallet or GitHub account
+3. Navigate to the Explorer tab
+4. Click **"Publish Your Own Project"**
 
-![SubQuery Publish Button](https://subquery.network/doc/assets/images/publish_new_project-f94ebedbea2b45a3f56f8d72ea6a5f92.png)
+**Note**: The publish workflow is done through the SubQuery Explorer web interface.
 
 ### 3.2 Enter Project Details
 
@@ -309,7 +317,8 @@ schema:
 3. **Project Description**
    ```
    SubQuery indexer for OpenZeppelin Stellar Access Control and Ownable contracts.
-   Indexes role grants, revocations, and ownership transfers with full event history.
+   Indexes all 9 events including role management (grants, revocations, admin changes),
+   admin transfers, and ownership transfers with full event history.
    ```
 
 ### 3.3 Configure Deployment Metadata
@@ -328,10 +337,10 @@ Provide information that Node Operators and Consumers will find useful:
 - **Version**: `1.0.0` (follow [semantic versioning](https://semver.org/))
 - **Deployment Description**:
   ```
-  Initial production release. Indexes AccessControl (RoleGranted, RoleRevoked,
-  AdminTransferInitiated, AdminTransferCompleted) and Ownable events
-  (OwnershipTransferStarted, OwnershipTransferCompleted) from OpenZeppelin
-  Stellar contracts. Optimized for SubQuery Network with deterministic indexing.
+  Initial production release. Indexes all 9 events from OpenZeppelin Stellar Access Control
+  and Ownable contracts: RoleGranted, RoleRevoked, RoleAdminChanged, AdminTransferInitiated,
+  AdminTransferCompleted, AdminRenounced, OwnershipTransferStarted, OwnershipTransferCompleted,
+  and OwnershipRenounced. Optimized for SubQuery Network with deterministic indexing.
   ```
 
 ### 3.4 Network Configuration
@@ -484,24 +493,30 @@ While SubQuery Network is recommended for true decentralization, other options e
 
 ### Option A: SubQuery Managed Service
 
-Centralized but fully managed by SubQuery:
+**Note**: As of 2024/2025, SubQuery has transitioned to focus on the decentralized SubQuery Network. The Managed Service may be deprecated or limited. Check the [official SubQuery documentation](https://subquery.network/doc/) for current hosting options.
 
-1. Visit [SubQuery Managed Service](https://managedservice.subquery.network)
+If still available:
+
+1. Visit SubQuery's official website for managed service information
 2. Connect GitHub
 3. Select repository and branch
 4. Configure and deploy
 
-**Endpoint:**
+**Endpoint format:**
 
 ```
 https://api.subquery.network/sq/YOUR_ORG/PROJECT_NAME
 ```
 
-### Option B: OnFinality Indexing Service
+### Option B: OnFinality Infrastructure Services
+
+**Note**: OnFinality provides blockchain infrastructure services. Check their [official website](https://onfinality.io) for current SubQuery-related offerings, as services may have evolved.
+
+If available:
 
 1. Visit [OnFinality](https://onfinality.io)
-2. Create SubQuery indexer
-3. Configure network and resources
+2. Explore SubQuery indexer hosting options
+3. Configure network and resources as per their documentation
 
 ### Option C: Self-Hosted
 
@@ -751,6 +766,7 @@ For self-hosted deployments:
 ## Multi-Network Deployment Strategy
 
 SubQuery supports indexing multiple blockchain networks with shared business logic. This section covers both:
+
 1. **Multi-chain support** (Stellar, Polkadot, Ethereum, etc.)
 2. **Same chain, different networks** (Stellar testnet vs mainnet)
 
@@ -802,7 +818,7 @@ dataSources:
         - handler: handleRoleGranted
           kind: stellar/EventHandler
           filter:
-            topics: ['RoleGranted']
+            topics: ['role_granted']
         # ... other handlers
 ```
 
@@ -811,7 +827,7 @@ dataSources:
 ```yaml
 # stellar-mainnet.yaml
 specVersion: 1.0.0
-name: stellar-access-control-indexer-mainnet  # Different name
+name: stellar-access-control-indexer-mainnet # Different name
 version: 1.0.0
 runner:
   node:
@@ -821,21 +837,21 @@ runner:
     name: '@subql/query'
     version: '*'
 network:
-  chainId: 'Public Global Stellar Network ; September 2015'  # Different chainId
+  chainId: 'Public Global Stellar Network ; September 2015' # Different chainId
   endpoint: ['https://horizon.stellar.org']
   sorobanEndpoint: 'https://soroban.stellar.org'
 schema:
-  file: ./schema.graphql  # Same schema
+  file: ./schema.graphql # Same schema
 dataSources:
   - kind: stellar/Runtime
-    startBlock: 50000000  # Different startBlock for mainnet
+    startBlock: 50000000 # Different startBlock for mainnet
     mapping:
-      file: ./dist/index.js  # Same compiled code
+      file: ./dist/index.js # Same compiled code
       handlers:
         - handler: handleRoleGranted
           kind: stellar/EventHandler
           filter:
-            topics: ['RoleGranted']
+            topics: ['role_granted']
         # ... same handlers
 ```
 
@@ -946,7 +962,7 @@ If you want to support other blockchains (Polkadot, Ethereum, Cosmos) with simil
    {
      "dependencies": {
        "@subql/types-stellar": "latest",
-       "@subql/types-ethereum": "latest",  // If supporting Ethereum
+       "@subql/types-ethereum": "latest", // If supporting Ethereum
        "@subql/types": "latest"
      }
    }
@@ -981,8 +997,12 @@ This approach maximizes code reuse while maintaining chain-specific optimization
 
 ### SubQuery Managed Service
 
-- **Free Tier**: 3M monthly requests, suitable for testing
-- **Growth Tier**: From $49/month, 100M requests
+**Note**: Pricing and availability may have changed. Verify current offerings on the [official SubQuery website](https://subquery.network).
+
+Historical pricing (verify for current rates):
+
+- **Free Tier**: Limited monthly requests, suitable for testing
+- **Growth Tier**: From ~$49/month, higher request limits
 - **Enterprise**: Custom pricing for high volume
 
 ### Self-Hosted
@@ -1002,7 +1022,7 @@ This approach maximizes code reuse while maintaining chain-specific optimization
 
 - [SubQuery Network Documentation](https://subquery.network/doc/subquery_network/architects/publish.html)
 - [IPFS Publishing Guide](https://subquery.network/doc/indexer/miscellaneous/ipfs.html)
-- [SubQuery Academy](https://academy.subquery.network)
+- [SubQuery Documentation Portal](https://subquery.network/doc/)
 
 ### Community
 

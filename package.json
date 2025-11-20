@@ -9,7 +9,8 @@
     "start:docker": "docker compose pull && docker compose up --remove-orphans",
     "dev": "subql codegen && subql build",
     "prepack": "rm -rf dist && npm run build",
-    "test": "subql build && subql-node-stellar test"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "homepage": "https://github.com/OpenZeppelin/stellar-access-control-indexer",
   "repository": "github:OpenZeppelin/stellar-access-control-indexer",
@@ -22,13 +23,14 @@
   "license": "MIT",
   "dependencies": {
     "@subql/common": "latest",
-    "@subql/types-stellar": "latest",
-    "text-encoding": "^0.7.0"
+    "@subql/types-stellar": "latest"
   },
   "devDependencies": {
     "@subql/cli": "latest",
     "@subql/testing": "latest",
     "@subql/types": "latest",
-    "typescript": "latest"
+    "@types/node": "^24.10.1",
+    "typescript": "latest",
+    "vitest": "^4.0.12"
   }
 }

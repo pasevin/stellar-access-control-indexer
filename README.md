@@ -7,16 +7,38 @@ A SubQuery indexer for OpenZeppelin Stellar Access Control and Ownable contracts
 ### Complete OpenZeppelin Event Coverage
 
 **AccessControl Events:**
-- `RoleGranted` - When a role is assigned to an account
-- `RoleRevoked` - When a role is removed from an account
-- `AdminTransferInitiated` - When admin transfer begins
-- `AdminTransferCompleted` - When admin transfer is accepted
+
+- `role_granted` - When a role is assigned to an account
+- `role_revoked` - When a role is removed from an account
+- `role_admin_changed` - When the admin role for a role is changed
+- `admin_transfer_initiated` - When admin transfer begins
+- `admin_transfer_completed` - When admin transfer is accepted
+- `admin_renounced` - When admin role is permanently renounced
 
 **Ownable Events:**
-- `OwnershipTransferStarted` - When ownership transfer begins
-- `OwnershipTransferCompleted` - When ownership is accepted by new owner
+
+- `ownership_transfer` - When ownership transfer begins
+- `ownership_transfer_completed` - When ownership is accepted by new owner
+- `ownership_renounced` - When ownership is permanently renounced
+
+**Note:** Event names in Soroban are snake_case, not PascalCase.
+
+### Implementation Notes
+
+**Event Data Structures:**
+
+The actual event structures from OpenZeppelin Stellar contracts differ slightly from the Rust type definitions:
+
+- **role_granted/role_revoked**: The `caller` field is wrapped in a Map: `{ caller: Address }`
+- **ownership_transfer**: Contains a Map with `{ old_owner: Address, new_owner: Address, live_until_ledger: u32 }`
+- **admin_transfer_initiated**: `current_admin` is in topics, data contains `{ new_admin: Address, live_until_ledger: u32 }`
+- **admin_transfer_completed**: `new_admin` is in topics, data contains `{ previous_admin: Address }`
+- **ownership_renounced/admin_renounced**: The address may be in `topic[1]` or `event.value` depending on contract version
+
+The indexer handlers include robust fallback logic to handle these variations.
 
 ### Additional Capabilities
+
 - Maintains current state of role memberships and contract ownership
 - Provides server-side filtering and pagination
 - Tracks complete event history with timestamps and block heights
@@ -28,6 +50,7 @@ A SubQuery indexer for OpenZeppelin Stellar Access Control and Ownable contracts
 **⚠️ The public Stellar testnet Horizon endpoint (`horizon-testnet.stellar.org`) has very strict rate limits that make continuous indexing difficult or impossible without a private endpoint.**
 
 For production use or continuous indexing, you **must** use one of the following:
+
 - A private Horizon node
 - An API key from a Horizon provider (BlockDaemon, QuickNode, etc.)
 - Your own self-hosted Horizon instance
@@ -117,8 +140,8 @@ query {
   ) {
     nodes {
       type
-      account  # new admin
-      admin    # previous admin
+      account # new admin
+      admin # previous admin
       timestamp
       txHash
     }
@@ -182,44 +205,47 @@ const members = await client.getRoleMembers('CONTRACT_ADDRESS', 'ADMIN_ROLE');
 const owner = await client.getContractOwner('CONTRACT_ADDRESS');
 ```
 
-## Deployment to SubQuery Managed Service
+## Deployment to SubQuery Network
 
-### 1. Create Project
+### 1. Publish to IPFS
 
-1. Go to [managed.subquery.network](https://managed.subquery.network)
-2. Login with GitHub
-3. Click "Create Project"
-4. Select this repository
+The SubQuery Network requires IPFS deployment. See [DEPLOYMENT.md](DEPLOYMENT.md) for comprehensive instructions.
 
-### 2. Deploy
+### 2. Deploy via CLI
 
 ```bash
-# Option 1: Deploy via CLI
+# Build and publish to IPFS
+subql build
 subql publish
 
-# Option 2: Deploy via GitHub Actions (on push to main)
+# Deploy to SubQuery Network
+subql deployment:deploy
 ```
 
-### 3. Get Endpoint
+### 3. Access Your Indexer
 
-After deployment, you'll receive a production GraphQL endpoint:
+After deployment, access via the SubQuery Network:
 
 ```
-https://api.subquery.network/sq/{your-org}/{project-name}
+https://gateway.subquery.network/query/{deployment-id}
 ```
+
+For detailed deployment instructions including multi-network support, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Example Contract: RBAC Playground
 
 This repository includes a complete example contract (`examples/rbac-playground`) that demonstrates all OpenZeppelin Access Control features:
 
 ### Features
+
 - Implements both AccessControl and Ownable traits
 - Custom minter role with mint/burn functions
-- Emits all 6 OpenZeppelin events
+- Emits all 9 OpenZeppelin events (6 Access Control + 3 Ownable)
 - Role enumeration capabilities
 - Ready for testnet deployment
 
 ### Quick Deploy
+
 ```bash
 cd examples/rbac-playground
 make build    # Build the contract
@@ -284,15 +310,24 @@ See `schema.graphql` for complete entity definitions.
 
 ## Event Handlers
 
-| Handler                            | Event                      | Description                                     |
-| ---------------------------------- | -------------------------- | ----------------------------------------------- |
-| `handleRoleGranted`                | RoleGranted                | Processes role grant events                    |
-| `handleRoleRevoked`                | RoleRevoked                | Processes role revocation events               |
-| `handleAdminTransferInitiated`     | AdminTransferInitiated     | Tracks when admin transfer starts              |
-| `handleAdminTransferCompleted`     | AdminTransferCompleted     | Records completed admin transfers              |
-| `handleOwnershipTransferStarted`   | OwnershipTransferStarted   | Tracks when ownership transfer begins          |
-| `handleOwnershipTransferCompleted` | OwnershipTransferCompleted | Records completed ownership transfers          |
-| `handleContractDeployment`         | Contract Creation          | Tracks new contract deployments                |
+| Handler                            | Event                          | Description                             |
+| ---------------------------------- | ------------------------------ | --------------------------------------- |
+| `handleRoleGranted`                | `role_granted`                 | Processes role grant events             |
+| `handleRoleRevoked`                | `role_revoked`                 | Processes role revocation events        |
+| `handleRoleAdminChanged`           | `role_admin_changed`           | Processes role admin changes            |
+| `handleAdminTransferInitiated`     | `admin_transfer_initiated`     | Processes admin transfer initiation     |
+| `handleAdminTransferCompleted`     | `admin_transfer_completed`     | Processes admin transfer completion     |
+| `handleAdminRenounced`             | `admin_renounced`              | Processes admin renunciation            |
+| `handleOwnershipTransferStarted`   | `ownership_transfer`           | Processes ownership transfer initiation |
+| `handleOwnershipTransferCompleted` | `ownership_transfer_completed` | Records completed ownership transfers   |
+| `handleOwnershipRenounced`         | `ownership_renounced`          | Processes ownership renunciation        |
+| `handleContractDeployment`         | Contract Creation              | Tracks contract deployments             |
+
+**Implementation Notes:**
+
+- Event names in Soroban are **snake_case** (e.g., `role_granted`), not PascalCase.
+- All ScVal decoding uses `scValToNative` from `@stellar/stellar-sdk` for robust, automatic type conversion.
+- Ownership event data is a Map structure; `scValToNative` converts it to a JS object for easy field access.
 
 ## Troubleshooting
 
@@ -318,22 +353,25 @@ See `schema.graphql` for complete entity definitions.
 4. **Rate Limiting (HTTP 429)**: If you encounter rate limit errors from Horizon API:
 
    - **Immediate fixes:**
+
      - Reduce `--batch-size` to 1 or 2 in docker-compose.yml
      - Increase timeout: `--timeout=90000` or higher
      - Wait 1-2 minutes before restarting to let rate limits reset
-   
+
    - **Environment variables for retry logic:**
+
      ```yaml
      environment:
        STELLAR_ENDPOINT_RETRY_ATTEMPTS: 5
-       STELLAR_ENDPOINT_RETRY_DELAY: 10000  # 10 seconds between retries
+       STELLAR_ENDPOINT_RETRY_DELAY: 10000 # 10 seconds between retries
      ```
-   
+
    - **Long-term solutions:**
+
      - Use a private Horizon node
      - Get an API key from a Horizon provider (e.g., BlockDaemon, QuickNode)
      - Run your own Horizon instance
-   
+
    - **Note:** The public Horizon endpoint has strict rate limits (~200 requests/minute). Intensive indexing operations will frequently hit these limits.
 
 5. **Container Health Check Failures**: If the subquery-node container is unhealthy:
