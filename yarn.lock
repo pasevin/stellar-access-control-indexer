@@ -1190,6 +1190,33 @@
     yaml "^2.8.1"
     zod "^3.25.67"
 
+"@subql/common-stellar@^4.5.0":
+  version "4.5.0"
+  resolved "https://registry.yarnpkg.com/@subql/common-stellar/-/common-stellar-4.5.0.tgz#f771f6a09ada4855d9007b57aff6574f91d3caa7"
+  integrity sha512-u8WzneCwuLv5N8NaOVJGjiXarYntYVuTfTTx0jneGHKw24dozNDbbgVYC1YUAxFYHiWK2WlRdy9MvVkOkiRvCA==
+  dependencies:
+    "@stellar/stellar-sdk" "^14.1.0"
+    "@subql/common" "^5.7.0"
+    "@subql/types-stellar" "5.1.0"
+    js-yaml "^4.1.0"
+    pino "^6.13.3"
+    reflect-metadata "^0.1.13"
+
+"@subql/common@^5.7.0":
+  version "5.8.2"
+  resolved "https://registry.yarnpkg.com/@subql/common/-/common-5.8.2.tgz#39d329e1ae3ad57e11c1aa2df5c8019ff2cbb336"
+  integrity sha512-uXWfzKkHxoPGGFCzmKfJiQ5lrA3Z8ZBx8y2zQmI6VDiKSOrgXARo47de3J8bpkSeMZFxNsCBS+BgKX1TuBFLfQ==
+  dependencies:
+    "@subql/types-core" "~2.2.0"
+    axios "^1.13.1"
+    class-transformer "^0.5.1"
+    class-validator "0.14.1"
+    form-data "^4.0.4"
+    js-yaml "^4.1.1"
+    reflect-metadata "^0.2.2"
+    semver "^7.6.3"
+    update-notifier "^5.1.0"
+
 "@subql/common@latest":
   version "5.8.1"
   resolved "https://registry.yarnpkg.com/@subql/common/-/common-5.8.1.tgz#accbb5001ab3a94caf975e24246b522b62c9ae78"
@@ -1266,7 +1293,7 @@
     package-json-type "^1.0.3"
     pino "^6.13.3"
 
-"@subql/types-stellar@latest":
+"@subql/types-stellar@5.1.0", "@subql/types-stellar@latest":
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/@subql/types-stellar/-/types-stellar-5.1.0.tgz#01882677da71a783b95a5bd3946a1ad242a26e7f"
   integrity sha512-bQKoPljBTE8XaUNInbmTPxRirQ/bBbmLq61n4C1F30o8aj6NFp9EuEyUeqPNuG7y+kWeL29LS1oW6uBAs5rq9w==
@@ -3982,6 +4009,11 @@ real-require@^0.2.0:
   version "0.2.0"
   resolved "https://registry.yarnpkg.com/real-require/-/real-require-0.2.0.tgz#209632dea1810be2ae063a6ac084fee7e33fba78"
   integrity sha512-57frrGM/OCTLqLOAh0mhVA9VBMHd+9U7Zb2THMGdBUoZVOtGbJzjxsYGDJ3A9AYYCP4hn6y1TVbaOfzWtm5GFg==
+
+reflect-metadata@^0.1.13:
+  version "0.1.14"
+  resolved "https://registry.yarnpkg.com/reflect-metadata/-/reflect-metadata-0.1.14.tgz#24cf721fe60677146bb77eeb0e1f9dece3d65859"
+  integrity sha512-ZhYeb6nRaXCfhnndflDK8qI6ZQ/YcWZCISRAWICW9XYqMUwjZM9Z0DveWX/ABN01oxSHwVxKQmxeYZSsm0jh5A==
 
 reflect-metadata@^0.2.2:
   version "0.2.2"

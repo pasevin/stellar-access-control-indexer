@@ -22,7 +22,9 @@
   "author": "OpenZeppelin",
   "license": "MIT",
   "dependencies": {
+    "@stellar/stellar-sdk": "^14.1.0",
     "@subql/common": "latest",
+    "@subql/common-stellar": "^4.5.0",
     "@subql/types-stellar": "latest"
   },
   "devDependencies": {
