@@ -10,6 +10,8 @@ type AccessControlEvent @entity {
   role: String @index # Role identifier (nullable for ownership events)
   account: String @index # Account receiving the role or ownership (nullable for RoleAdminChanged)
   admin: String # Admin/grantor address (if available)
+  previousAdminRole: String # Previous admin role (only for RoleAdminChanged events)
+  newAdminRole: String # New admin role (only for RoleAdminChanged events)
   type: EventType! @index # Type of event
   blockHeight: BigInt! # Block height when event occurred
   timestamp: Date! @index # Timestamp of the event

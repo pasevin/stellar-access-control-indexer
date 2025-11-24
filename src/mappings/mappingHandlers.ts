@@ -541,7 +541,7 @@ export async function handleRoleAdminChanged(
   // Create event record
   // Note: This event doesn't involve an account address - it's about role-to-role relationships
   // The role whose admin is being changed is stored in the 'role' field
-  // Previous/new admin roles are available in the raw event data if needed
+  // Previous/new admin roles are stored in dedicated fields for audit purposes
   const eventId = `${event.id}-role-admin-changed`;
   const accessEvent = AccessControlEvent.create({
     id: eventId,
@@ -549,6 +549,8 @@ export async function handleRoleAdminChanged(
     role: role,
     account: undefined as any, // No account involved - this is about role administration
     admin: undefined, // No address involved - admin field is reserved for addresses
+    previousAdminRole: previousAdminRole, // Store for audit trail
+    newAdminRole: newAdminRole, // Store for audit trail
     type: EventType.ROLE_ADMIN_CHANGED,
     blockHeight: BigInt(event.ledger!.sequence),
     timestamp: new Date(event.ledgerClosedAt),
