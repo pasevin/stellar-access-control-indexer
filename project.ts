@@ -44,7 +44,7 @@ const project: StellarProject = {
   dataSources: [
     {
       kind: StellarDatasourceKind.Runtime,
-      startBlock: 1685700,
+      startBlock: 0,
       mapping: {
         file: './dist/index.js',
         handlers: [
