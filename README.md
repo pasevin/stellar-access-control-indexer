@@ -261,7 +261,8 @@ See [examples/rbac-playground/README.md](examples/rbac-playground/README.md) for
 This indexer supports both Stellar **Testnet** and **Mainnet** through separate project configurations:
 
 #### Testnet Configuration (`project.ts`)
-- **Project Name**: `stellar-access-control-indexer-testnet`
+
+- **Project Name**: `stellar-access-control-indexer` (default - maintains existing deployments)
 - **Network**: Test SDF Network
 - **Start Block**: 1,685,700 (early testnet OZ contract activity)
 - **Endpoints**:
@@ -269,28 +270,34 @@ This indexer supports both Stellar **Testnet** and **Mainnet** through separate 
   - Soroban: `https://soroban-testnet.stellar.org`
 
 #### Mainnet Configuration (`project-mainnet.ts`)
-- **Project Name**: `stellar-access-control-indexer-mainnet`
+
+- **Project Name**: `stellar-access-control-indexer-mainnet` (separate deployment)
 - **Network**: Public Global Stellar Network
 - **Start Block**: 57,243,255 (~May 16, 2025 - when OZ Access Control was created)
 - **Endpoints**:
   - Horizon: `https://horizon.stellar.org`
   - Soroban: `https://soroban-rpc.mainnet.stellar.gateway.fm`
 
+**Note:** The testnet configuration maintains its original project name to preserve compatibility with existing SubQuery Network deployments. Mainnet uses a separate name to avoid conflicts.
+
 #### Deploying to Specific Network
 
 **For Testnet (default):**
+
 ```bash
 yarn build           # Uses project.ts by default
 subql publish
 ```
 
 **For Mainnet:**
+
 ```bash
 subql build project-mainnet.ts
 subql publish project-mainnet.ts
 ```
 
 **Docker deployment:**
+
 ```bash
 # Testnet
 docker-compose up -d

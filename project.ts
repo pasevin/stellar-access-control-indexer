@@ -5,10 +5,10 @@ import {
 } from '@subql/types-stellar';
 import { Horizon } from '@stellar/stellar-sdk';
 
-/* Testnet Project Configuration */
+/* Testnet Project Configuration (default) */
 const project: StellarProject = {
   specVersion: '1.0.0',
-  name: 'stellar-access-control-indexer-testnet',
+  name: 'stellar-access-control-indexer',
   version: '1.0.0',
   runner: {
     node: {
