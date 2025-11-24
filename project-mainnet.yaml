@@ -1,0 +1,77 @@
+# // Auto-generated , DO NOT EDIT
+specVersion: 1.0.0
+name: stellar-access-control-indexer-mainnet
+version: 1.0.0
+runner:
+  node:
+    name: '@subql/node-stellar'
+    version: '*'
+  query:
+    name: '@subql/query'
+    version: '*'
+description: >-
+  SubQuery indexer for OpenZeppelin Stellar Access Control and Ownable contracts
+  on Mainnet, enabling server-side filtering and historical queries
+repository: https://github.com/OpenZeppelin/stellar-access-control-indexer
+schema:
+  file: ./schema.graphql
+network:
+  chainId: Public Global Stellar Network ; September 2015
+  endpoint:
+    - https://horizon.stellar.org
+  sorobanEndpoint: https://soroban-rpc.mainnet.stellar.gateway.fm
+dataSources:
+  - kind: stellar/Runtime
+    startBlock: 57243255
+    mapping:
+      file: ./dist/index.js
+      handlers:
+        - handler: handleRoleGranted
+          kind: soroban/EventHandler
+          filter:
+            topics:
+              - role_granted
+        - handler: handleRoleRevoked
+          kind: soroban/EventHandler
+          filter:
+            topics:
+              - role_revoked
+        - handler: handleAdminTransferInitiated
+          kind: soroban/EventHandler
+          filter:
+            topics:
+              - admin_transfer_initiated
+        - handler: handleAdminTransferCompleted
+          kind: soroban/EventHandler
+          filter:
+            topics:
+              - admin_transfer_completed
+        - handler: handleAdminRenounced
+          kind: soroban/EventHandler
+          filter:
+            topics:
+              - admin_renounced
+        - handler: handleRoleAdminChanged
+          kind: soroban/EventHandler
+          filter:
+            topics:
+              - role_admin_changed
+        - handler: handleOwnershipTransferStarted
+          kind: soroban/EventHandler
+          filter:
+            topics:
+              - ownership_transfer
+        - handler: handleOwnershipTransferCompleted
+          kind: soroban/EventHandler
+          filter:
+            topics:
+              - ownership_transfer_completed
+        - handler: handleOwnershipRenounced
+          kind: soroban/EventHandler
+          filter:
+            topics:
+              - ownership_renounced
+        - handler: handleContractDeployment
+          kind: stellar/OperationHandler
+          filter:
+            type: invokeHostFunction

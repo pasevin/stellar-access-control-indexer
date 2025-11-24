@@ -5,10 +5,10 @@ import {
 } from '@subql/types-stellar';
 import { Horizon } from '@stellar/stellar-sdk';
 
-/* Testnet Project Configuration */
+/* Mainnet Project Configuration */
 const project: StellarProject = {
   specVersion: '1.0.0',
-  name: 'stellar-access-control-indexer-testnet',
+  name: 'stellar-access-control-indexer-mainnet',
   version: '1.0.0',
   runner: {
     node: {
@@ -21,29 +21,28 @@ const project: StellarProject = {
     },
   },
   description:
-    'SubQuery indexer for OpenZeppelin Stellar Access Control and Ownable contracts on Testnet, enabling server-side filtering and historical queries',
+    'SubQuery indexer for OpenZeppelin Stellar Access Control and Ownable contracts on Mainnet, enabling server-side filtering and historical queries',
   repository: 'https://github.com/OpenZeppelin/stellar-access-control-indexer',
   schema: {
     file: './schema.graphql',
   },
   network: {
-    /* The genesis hash of the Stellar testnet */
-    chainId: 'Test SDF Network ; September 2015',
+    /* The genesis hash of the Stellar mainnet */
+    chainId: 'Public Global Stellar Network ; September 2015',
     /**
-     * Testnet endpoints - public non-pruned archive nodes
+     * Mainnet endpoints - public non-pruned archive nodes
      * Public nodes may be rate limited, which can affect indexing speed
-     * When developing your project we suggest getting a private API key
-     * You can get them from OnFinality for free https://app.onfinality.io
+     * Consider using a private API key for production deployments
      */
-    endpoint: ['https://horizon-testnet.stellar.org'],
-    /* Soroban testnet endpoint */
-    sorobanEndpoint: 'https://soroban-testnet.stellar.org',
+    endpoint: ['https://horizon.stellar.org'],
+    /* Soroban mainnet endpoint */
+    sorobanEndpoint: 'https://soroban-rpc.mainnet.stellar.gateway.fm',
   },
   dataSources: [
     {
       kind: StellarDatasourceKind.Runtime,
-      // Start from early testnet blocks with OZ contract activity
-      startBlock: 1685700,
+      // Start from approximately 2025-05-16 (when OZ Access Control was created)
+      startBlock: 57243255,
       mapping: {
         file: './dist/index.js',
         handlers: [
