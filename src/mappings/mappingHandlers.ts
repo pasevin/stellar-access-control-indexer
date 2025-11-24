@@ -517,6 +517,9 @@ export async function handleAdminRenounced(event: SorobanEvent): Promise<void> {
  * Event signature: role_admin_changed(role: Symbol, previous_admin_role: Symbol, new_admin_role: Symbol)
  * Topics: ["role_admin_changed", role: Symbol]
  * Data: { previous_admin_role: Symbol, new_admin_role: Symbol }
+ *
+ * Note: This event does NOT involve an account - it's about changing which role
+ * administers another role. We store role names in admin fields for reference.
  */
 export async function handleRoleAdminChanged(
   event: SorobanEvent
@@ -536,13 +539,14 @@ export async function handleRoleAdminChanged(
   const newAdminRole = eventData.new_admin_role as string;
 
   // Create event record
+  // Note: account is null because this event is about role administration, not account membership
   const eventId = `${event.id}-role-admin-changed`;
   const accessEvent = AccessControlEvent.create({
     id: eventId,
     contract: contractAddress,
     role: role,
-    account: newAdminRole, // Use new admin role as account for tracking
-    admin: previousAdminRole, // Use previous admin role as admin for reference
+    account: undefined as any, // No account involved - this is about role-to-role administration
+    admin: `${previousAdminRole} -> ${newAdminRole}`, // Store both admin roles for reference
     type: EventType.ROLE_ADMIN_CHANGED,
     blockHeight: BigInt(event.ledger!.sequence),
     timestamp: new Date(event.ledgerClosedAt),

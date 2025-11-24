@@ -8,7 +8,7 @@ type AccessControlEvent @entity {
   id: ID! # Unique identifier: txHash-logIndex
   contract: String! @index # Contract address
   role: String @index # Role identifier (nullable for ownership events)
-  account: String! @index # Account receiving the role or ownership
+  account: String @index # Account receiving the role or ownership (nullable for RoleAdminChanged)
   admin: String # Admin/grantor address (if available)
   type: EventType! @index # Type of event
   blockHeight: BigInt! # Block height when event occurred
