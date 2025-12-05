@@ -442,6 +442,9 @@ impl RbacPlayground {
         Self::require_not_paused(e);
 
         let count = recipients.len();
+        if count != amounts.len() {
+            panic!("recipients and amounts must have the same length");
+        }
         let mut i: u32 = 0;
 
         while i < count {
@@ -483,6 +486,9 @@ impl RbacPlayground {
         Self::require_not_paused(e);
 
         let count = accounts.len();
+        if count != amounts.len() {
+            panic!("accounts and amounts must have the same length");
+        }
         let mut i: u32 = 0;
 
         while i < count {
