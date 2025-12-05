@@ -1,1 +1,0 @@
-/Users/ghost/dev/repos/OpenZeppelin/stellar-access-control-indexer/examples/rbac-playground/target/wasm32-unknown-unknown/release/librbac_playground.rlib: /Users/ghost/dev/repos/OpenZeppelin/stellar-access-control-indexer/examples/rbac-playground/src/lib.rs
