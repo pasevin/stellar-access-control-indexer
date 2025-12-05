@@ -289,7 +289,7 @@ impl RbacPlayground {
     /// Mint tokens to `to` (requires MINTER role).
     #[only_role(caller, "minter")]
     pub fn mint(e: &Env, to: Address, amount: i128, caller: Address) {
-        caller.require_auth();
+        // Note: #[only_role] macro handles require_auth()
         Self::require_not_paused(e);
 
         // Update balance
@@ -318,7 +318,7 @@ impl RbacPlayground {
     /// Burn tokens from `from` (requires BURNER role).
     #[only_role(caller, "burner")]
     pub fn burn(e: &Env, from: Address, amount: i128, caller: Address) {
-        caller.require_auth();
+        // Note: #[only_role] macro handles require_auth()
         Self::require_not_paused(e);
 
         let key = DataKey::Balance(from.clone());
@@ -346,7 +346,7 @@ impl RbacPlayground {
     /// Pause the contract (requires PAUSER role).
     #[only_role(caller, "pauser")]
     pub fn pause(e: &Env, caller: Address) {
-        caller.require_auth();
+        // Note: #[only_role] macro handles require_auth()
         e.storage().instance().set(&DataKey::Paused, &true);
         Paused { caller }.publish(e);
     }
@@ -354,7 +354,7 @@ impl RbacPlayground {
     /// Unpause the contract (requires PAUSER role).
     #[only_role(caller, "pauser")]
     pub fn unpause(e: &Env, caller: Address) {
-        caller.require_auth();
+        // Note: #[only_role] macro handles require_auth()
         e.storage().instance().set(&DataKey::Paused, &false);
         Unpaused { caller }.publish(e);
     }
@@ -367,8 +367,7 @@ impl RbacPlayground {
     /// This demonstrates access-controlled view functions.
     #[only_role(caller, "viewer")]
     pub fn view_sensitive_stats(e: &Env, caller: Address) -> (i128, u64, bool) {
-        caller.require_auth();
-
+        // Note: #[only_role] macro handles require_auth()
         let total_supply: i128 = e.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0);
         let pending_count: u64 = e.storage().instance().get(&DataKey::PendingTransferCounter).unwrap_or(0);
         let is_paused: bool = e.storage().instance().get(&DataKey::Paused).unwrap_or(false);
@@ -385,8 +384,7 @@ impl RbacPlayground {
     /// View a pending transfer details (requires VIEWER role).
     #[only_role(caller, "viewer")]
     pub fn view_pending_transfer(e: &Env, id: u64, caller: Address) -> PendingTransfer {
-        caller.require_auth();
-
+        // Note: #[only_role] macro handles require_auth()
         let key = DataKey::PendingTransfer(id);
         let transfer: PendingTransfer = e.storage().instance().get(&key).unwrap();
 
@@ -407,7 +405,7 @@ impl RbacPlayground {
     /// This is for escrow or administrative transfers.
     #[only_role(caller, "transfer")]
     pub fn execute_transfer(e: &Env, from: Address, to: Address, amount: i128, caller: Address) {
-        caller.require_auth();
+        // Note: #[only_role] macro handles require_auth()
         Self::require_not_paused(e);
 
         // Debit from
@@ -438,7 +436,7 @@ impl RbacPlayground {
     /// Batch mint to multiple addresses (requires OPERATOR role).
     #[only_role(caller, "operator")]
     pub fn batch_mint(e: &Env, recipients: Vec<Address>, amounts: Vec<i128>, caller: Address) {
-        caller.require_auth();
+        // Note: #[only_role] macro handles require_auth()
         Self::require_not_paused(e);
 
         let count = recipients.len();
@@ -482,7 +480,7 @@ impl RbacPlayground {
     /// Batch burn from multiple addresses (requires OPERATOR role).
     #[only_role(caller, "operator")]
     pub fn batch_burn(e: &Env, accounts: Vec<Address>, amounts: Vec<i128>, caller: Address) {
-        caller.require_auth();
+        // Note: #[only_role] macro handles require_auth()
         Self::require_not_paused(e);
 
         let count = accounts.len();
@@ -538,7 +536,7 @@ impl RbacPlayground {
         required_approvals: u32,
         proposer: Address,
     ) -> u64 {
-        proposer.require_auth();
+        // Note: #[only_role] macro handles require_auth()
         Self::require_not_paused(e);
 
         let id: u64 = e.storage().instance().get(&DataKey::PendingTransferCounter).unwrap_or(0);
@@ -573,7 +571,7 @@ impl RbacPlayground {
     /// When enough approvals are reached, the transfer is automatically executed.
     #[only_role(approver, "approver")]
     pub fn approve_transfer(e: &Env, id: u64, approver: Address) {
-        approver.require_auth();
+        // Note: #[only_role] macro handles require_auth()
         Self::require_not_paused(e);
 
         let key = DataKey::PendingTransfer(id);
