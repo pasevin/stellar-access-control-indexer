@@ -347,6 +347,7 @@ export async function handleAdminTransferInitiated(
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
     ledger: event.ledger.sequence,
+    liveUntilLedger: liveUntilLedger, // Expiration ledger for pending transfer
   });
 
   await accessEvent.save();
@@ -511,22 +512,36 @@ export async function handleOwnershipTransferStarted(
   }
 
   // Validate OZ data structure has expected fields
-  if (!('old_owner' in eventData) || !('new_owner' in eventData)) {
+  if (
+    !('old_owner' in eventData) ||
+    !('new_owner' in eventData) ||
+    !('live_until_ledger' in eventData)
+  ) {
     logger.debug(
       `Skipping non-OZ ownership_transfer event at ledger ${event.ledger.sequence} - ` +
-        `missing expected fields (old_owner, new_owner)`
+        `missing expected fields (old_owner, new_owner, live_until_ledger)`
     );
     return;
   }
 
   const oldOwner = eventData.old_owner as string;
   const newOwner = eventData.new_owner as string;
+  const liveUntilLedger = eventData.live_until_ledger;
 
   // Validate addresses are in valid Stellar format
   if (!isValidStellarAddress(oldOwner) || !isValidStellarAddress(newOwner)) {
     logger.debug(
       `Skipping non-OZ ownership_transfer event at ledger ${event.ledger.sequence} - ` +
         `invalid owner address format`
+    );
+    return;
+  }
+
+  // Validate live_until_ledger is a number
+  if (typeof liveUntilLedger !== 'number') {
+    logger.debug(
+      `Skipping non-OZ ownership_transfer event at ledger ${event.ledger.sequence} - ` +
+        `invalid live_until_ledger format`
     );
     return;
   }
@@ -544,6 +559,7 @@ export async function handleOwnershipTransferStarted(
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
     ledger: event.ledger.sequence,
+    liveUntilLedger: liveUntilLedger, // Expiration ledger for pending transfer
   });
 
   await accessEvent.save();

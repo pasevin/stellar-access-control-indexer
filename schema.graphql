@@ -17,6 +17,7 @@ type AccessControlEvent @entity {
   timestamp: Date! @index # Timestamp of the event
   txHash: String! # Transaction hash
   ledger: Int! # Ledger sequence number
+  liveUntilLedger: Int # Expiration ledger for pending transfers (AdminTransferInitiated, OwnershipTransferStarted)
 }
 
 # Event Types Enum
