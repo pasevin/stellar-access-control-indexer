@@ -6,9 +6,10 @@
 # Useful for testing UI with long lists of role members.
 #
 # Usage:
-#   ./add-many-accounts.sh <CONTRACT_ID> [NUM_ACCOUNTS]
+#   ./add-many-accounts.sh <CONTRACT_ID> [NUM_ACCOUNTS] [ADMIN_SOURCE]
 #
 # NUM_ACCOUNTS defaults to 35 if not provided.
+# ADMIN_SOURCE defaults to "default" if not provided.
 # =============================================================================
 
 set -e
@@ -23,13 +24,14 @@ NC='\033[0m' # No Color
 if [ -z "$1" ]; then
     echo -e "${RED}Error: Contract ID is required${NC}"
     echo ""
-    echo "Usage: $0 <CONTRACT_ID> [NUM_ACCOUNTS]"
+    echo "Usage: $0 <CONTRACT_ID> [NUM_ACCOUNTS] [ADMIN_SOURCE]"
     exit 1
 fi
 
 CONTRACT=$1
 NUM_ACCOUNTS=${2:-35}
-ADMIN=$(soroban keys address default)
+ADMIN_SOURCE=${3:-default}
+ADMIN=$(soroban keys address "$ADMIN_SOURCE")
 NETWORK="testnet"
 
 echo -e "${BLUE}=============================================${NC}"
@@ -37,7 +39,7 @@ echo -e "${BLUE}  Adding $NUM_ACCOUNTS Accounts with Roles${NC}"
 echo -e "${BLUE}=============================================${NC}"
 echo ""
 echo -e "${GREEN}Contract:${NC} $CONTRACT"
-echo -e "${GREEN}Admin:${NC}    $ADMIN"
+echo -e "${GREEN}Admin:${NC}    $ADMIN (source: $ADMIN_SOURCE)"
 echo -e "${GREEN}Accounts:${NC} $NUM_ACCOUNTS"
 echo ""
 
@@ -52,7 +54,7 @@ invoke() {
     local desc=$1
     shift
     echo -e "  ${BLUE}→${NC} $desc"
-    soroban contract invoke --id $CONTRACT --source default --network $NETWORK -- "$@" 2>&1 | head -1 || true
+    soroban contract invoke --id $CONTRACT --source "$ADMIN_SOURCE" --network $NETWORK -- "$@" 2>&1 | head -1 || true
 }
 
 # Generate and grant roles to accounts

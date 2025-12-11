@@ -36,37 +36,77 @@ import {
   ContractType,
 } from '../types';
 import { StellarOperation, SorobanEvent } from '@subql/types-stellar';
-import { scValToNative } from '@stellar/stellar-base';
+import {
+  isValidStellarAddress,
+  isValidRoleSymbol,
+  safeScValToNative,
+  getContractAddress,
+  hasValidLedgerInfo,
+} from './validation';
 
 /**
  * Handler for RoleGranted events from Access Control contracts
  * Event signature: role_granted(role: Symbol, account: Address, caller: Address)
  * Topics: ["role_granted", role, account]
  * Data: { caller: Address } (wrapped in a Map structure)
+ *
+ * OpenZeppelin event structure has exactly 3 topics.
  */
 export async function handleRoleGranted(event: SorobanEvent): Promise<void> {
+  // Validate event has required ledger info
+  if (!hasValidLedgerInfo(event)) {
+    logger.warn('Skipping role_granted event - missing ledger info');
+    return;
+  }
+
   logger.info(
-    `Processing RoleGranted event at ledger ${event.ledger!.sequence}`
+    `Processing RoleGranted event at ledger ${event.ledger.sequence}`
   );
 
-  // Extract and decode event data using scValToNative
-  const contractAddress = event.contractId?.contractId().toString()!;
-  const role = scValToNative(event.topic[1]) as string;
-  const account = scValToNative(event.topic[2]) as string;
+  // Validate OpenZeppelin event structure: exactly 3 topics (event_name, role, account)
+  if (event.topic.length !== 3) {
+    logger.debug(
+      `Skipping non-OZ role_granted event at ledger ${event.ledger.sequence} - ` +
+        `expected 3 topics, got ${event.topic.length}`
+    );
+    return;
+  }
 
-  // The event.value can be either a direct Address or a Map/Struct with 'caller' field
+  // Extract and validate contract address
+  const contractAddress = getContractAddress(event);
+  if (!contractAddress) {
+    logger.debug(
+      `Skipping role_granted event at ledger ${event.ledger.sequence} - ` +
+        `invalid contract address`
+    );
+    return;
+  }
+
+  const role = safeScValToNative<string>(event.topic[1]);
+  const account = safeScValToNative<string>(event.topic[2]);
+
+  // Validate decoded types match OZ expected format
+  if (!isValidRoleSymbol(role) || !isValidStellarAddress(account)) {
+    logger.debug(
+      `Skipping non-OZ role_granted event at ledger ${event.ledger.sequence} - ` +
+        `invalid role or account format`
+    );
+    return;
+  }
+
+  // The event.value contains { caller: Address }
   let sender: string | undefined;
   if (event.value) {
-    const decodedValue = scValToNative(event.value);
-    // Check if it's an object with 'caller' field or a direct string
+    const decodedValue = safeScValToNative<Record<string, unknown>>(
+      event.value
+    );
     if (
+      decodedValue &&
       typeof decodedValue === 'object' &&
-      decodedValue !== null &&
-      'caller' in decodedValue
+      'caller' in decodedValue &&
+      isValidStellarAddress(decodedValue.caller)
     ) {
-      sender = (decodedValue as { caller: string }).caller;
-    } else if (typeof decodedValue === 'string') {
-      sender = decodedValue;
+      sender = decodedValue.caller as string;
     }
   }
 
@@ -79,10 +119,10 @@ export async function handleRoleGranted(event: SorobanEvent): Promise<void> {
     account: account,
     admin: sender,
     type: EventType.ROLE_GRANTED,
-    blockHeight: BigInt(event.ledger!.sequence),
+    blockHeight: BigInt(event.ledger.sequence),
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
-    ledger: event.ledger!.sequence,
+    ledger: event.ledger.sequence,
   });
 
   // Update or create role membership
@@ -112,30 +152,64 @@ export async function handleRoleGranted(event: SorobanEvent): Promise<void> {
  * Event signature: role_revoked(role: Symbol, account: Address, caller: Address)
  * Topics: ["role_revoked", role, account]
  * Data: { caller: Address } (wrapped in a Map structure)
+ *
+ * OpenZeppelin event structure has exactly 3 topics.
  */
 export async function handleRoleRevoked(event: SorobanEvent): Promise<void> {
+  // Validate event has required ledger info
+  if (!hasValidLedgerInfo(event)) {
+    logger.warn('Skipping role_revoked event - missing ledger info');
+    return;
+  }
+
   logger.info(
-    `Processing RoleRevoked event at ledger ${event.ledger!.sequence}`
+    `Processing RoleRevoked event at ledger ${event.ledger.sequence}`
   );
 
-  // Extract and decode event data using scValToNative
-  const contractAddress = event.contractId?.contractId().toString()!;
-  const role = scValToNative(event.topic[1]) as string;
-  const account = scValToNative(event.topic[2]) as string;
+  // Validate OpenZeppelin event structure: exactly 3 topics (event_name, role, account)
+  if (event.topic.length !== 3) {
+    logger.debug(
+      `Skipping non-OZ role_revoked event at ledger ${event.ledger.sequence} - ` +
+        `expected 3 topics, got ${event.topic.length}`
+    );
+    return;
+  }
 
-  // The event.value can be either a direct Address or a Map/Struct with 'caller' field
+  // Extract and validate contract address
+  const contractAddress = getContractAddress(event);
+  if (!contractAddress) {
+    logger.debug(
+      `Skipping role_revoked event at ledger ${event.ledger.sequence} - ` +
+        `invalid contract address`
+    );
+    return;
+  }
+
+  const role = safeScValToNative<string>(event.topic[1]);
+  const account = safeScValToNative<string>(event.topic[2]);
+
+  // Validate decoded types match OZ expected format
+  if (!isValidRoleSymbol(role) || !isValidStellarAddress(account)) {
+    logger.debug(
+      `Skipping non-OZ role_revoked event at ledger ${event.ledger.sequence} - ` +
+        `invalid role or account format`
+    );
+    return;
+  }
+
+  // The event.value contains { caller: Address }
   let sender: string | undefined;
   if (event.value) {
-    const decodedValue = scValToNative(event.value);
-    // Check if it's an object with 'caller' field or a direct string
+    const decodedValue = safeScValToNative<Record<string, unknown>>(
+      event.value
+    );
     if (
+      decodedValue &&
       typeof decodedValue === 'object' &&
-      decodedValue !== null &&
-      'caller' in decodedValue
+      'caller' in decodedValue &&
+      isValidStellarAddress(decodedValue.caller)
     ) {
-      sender = (decodedValue as { caller: string }).caller;
-    } else if (typeof decodedValue === 'string') {
-      sender = decodedValue;
+      sender = decodedValue.caller as string;
     }
   }
 
@@ -148,10 +222,10 @@ export async function handleRoleRevoked(event: SorobanEvent): Promise<void> {
     account: account,
     admin: sender,
     type: EventType.ROLE_REVOKED,
-    blockHeight: BigInt(event.ledger!.sequence),
+    blockHeight: BigInt(event.ledger.sequence),
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
-    ledger: event.ledger!.sequence,
+    ledger: event.ledger.sequence,
   });
 
   // Remove role membership
@@ -170,27 +244,85 @@ export async function handleRoleRevoked(event: SorobanEvent): Promise<void> {
 
 /**
  * Handler for AdminTransferInitiated events
- * Definition: fn emit_admin_transfer_initiated(e: &Env, new_admin: &Address, previous_admin: &Address)
- * Topics: ["AdminTransferInitiated"]
- * Data: struct { new_admin: Address, previous_admin: Address }
+ * Definition: fn emit_admin_transfer_initiated(e: &Env, current_admin: &Address, new_admin: &Address, live_until_ledger: u32)
+ * Topics: ["admin_transfer_initiated", current_admin]
+ * Data: { new_admin: Address, live_until_ledger: u32 }
+ *
+ * OpenZeppelin event structure has exactly 2 topics.
  */
 export async function handleAdminTransferInitiated(
   event: SorobanEvent
 ): Promise<void> {
+  // Validate event has required ledger info
+  if (!hasValidLedgerInfo(event)) {
+    logger.warn(
+      'Skipping admin_transfer_initiated event - missing ledger info'
+    );
+    return;
+  }
+
   logger.info(
-    `Processing AdminTransferInitiated event at ledger ${
-      event.ledger!.sequence
-    }`
+    `Processing AdminTransferInitiated event at ledger ${event.ledger.sequence}`
   );
 
-  const contractAddress = event.contractId?.contractId().toString()!;
+  // Validate OpenZeppelin event structure: exactly 2 topics (event_name, current_admin)
+  if (event.topic.length !== 2) {
+    logger.debug(
+      `Skipping non-OZ admin_transfer_initiated event at ledger ${event.ledger.sequence} - ` +
+        `expected 2 topics, got ${event.topic.length}`
+    );
+    return;
+  }
+
+  // Extract and validate contract address
+  const contractAddress = getContractAddress(event);
+  if (!contractAddress) {
+    logger.debug(
+      `Skipping admin_transfer_initiated event at ledger ${event.ledger.sequence} - ` +
+        `invalid contract address`
+    );
+    return;
+  }
 
   // current_admin is in topic[1]
-  const currentAdmin = scValToNative(event.topic[1]) as string;
+  const currentAdmin = safeScValToNative<string>(event.topic[1]);
+
+  // Validate current_admin is a valid address
+  if (!isValidStellarAddress(currentAdmin)) {
+    logger.debug(
+      `Skipping non-OZ admin_transfer_initiated event at ledger ${event.ledger.sequence} - ` +
+        `invalid current_admin format`
+    );
+    return;
+  }
 
   // The event.value contains new_admin and live_until_ledger
-  const eventData = scValToNative(event.value) as Record<string, unknown>;
+  const eventData = safeScValToNative<Record<string, unknown>>(event.value);
+
+  // Validate OZ data structure has expected fields
+  if (
+    !eventData ||
+    typeof eventData !== 'object' ||
+    !('new_admin' in eventData)
+  ) {
+    logger.debug(
+      `Skipping non-OZ admin_transfer_initiated event at ledger ${event.ledger.sequence} - ` +
+        `missing expected field (new_admin)`
+    );
+    return;
+  }
+
   const newAdmin = eventData.new_admin as string;
+
+  // Validate new_admin is a valid address
+  if (!isValidStellarAddress(newAdmin)) {
+    logger.debug(
+      `Skipping non-OZ admin_transfer_initiated event at ledger ${event.ledger.sequence} - ` +
+        `invalid new_admin format`
+    );
+    return;
+  }
+
   const liveUntilLedger = eventData.live_until_ledger as number;
 
   // Create event record
@@ -202,10 +334,10 @@ export async function handleAdminTransferInitiated(
     account: newAdmin, // The new admin receiving the role
     admin: currentAdmin, // The current admin initiating transfer
     type: EventType.ADMIN_TRANSFER_INITIATED,
-    blockHeight: BigInt(event.ledger!.sequence),
+    blockHeight: BigInt(event.ledger.sequence),
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
-    ledger: event.ledger!.sequence,
+    ledger: event.ledger.sequence,
   });
 
   await accessEvent.save();
@@ -216,24 +348,81 @@ export async function handleAdminTransferInitiated(
  * Event signature: AdminTransferCompleted { new_admin: Address (topic), previous_admin: Address }
  * Topics: ["admin_transfer_completed", new_admin]
  * Data: { previous_admin: Address }
+ *
+ * OpenZeppelin event structure has exactly 2 topics.
  */
 export async function handleAdminTransferCompleted(
   event: SorobanEvent
 ): Promise<void> {
+  // Validate event has required ledger info
+  if (!hasValidLedgerInfo(event)) {
+    logger.warn(
+      'Skipping admin_transfer_completed event - missing ledger info'
+    );
+    return;
+  }
+
   logger.info(
-    `Processing AdminTransferCompleted event at ledger ${
-      event.ledger!.sequence
-    }`
+    `Processing AdminTransferCompleted event at ledger ${event.ledger.sequence}`
   );
 
-  const contractAddress = event.contractId?.contractId().toString()!;
+  // Validate OpenZeppelin event structure: exactly 2 topics (event_name, new_admin)
+  if (event.topic.length !== 2) {
+    logger.debug(
+      `Skipping non-OZ admin_transfer_completed event at ledger ${event.ledger.sequence} - ` +
+        `expected 2 topics, got ${event.topic.length}`
+    );
+    return;
+  }
+
+  // Extract and validate contract address
+  const contractAddress = getContractAddress(event);
+  if (!contractAddress) {
+    logger.debug(
+      `Skipping admin_transfer_completed event at ledger ${event.ledger.sequence} - ` +
+        `invalid contract address`
+    );
+    return;
+  }
 
   // new_admin is in topic[1]
-  const newAdmin = scValToNative(event.topic[1]) as string;
+  const newAdmin = safeScValToNative<string>(event.topic[1]);
+
+  // Validate new_admin is a valid address
+  if (!isValidStellarAddress(newAdmin)) {
+    logger.debug(
+      `Skipping non-OZ admin_transfer_completed event at ledger ${event.ledger.sequence} - ` +
+        `invalid new_admin format`
+    );
+    return;
+  }
 
   // The event.value contains previous_admin
-  const eventData = scValToNative(event.value) as Record<string, unknown>;
+  const eventData = safeScValToNative<Record<string, unknown>>(event.value);
+
+  // Validate OZ data structure has expected field
+  if (
+    !eventData ||
+    typeof eventData !== 'object' ||
+    !('previous_admin' in eventData)
+  ) {
+    logger.debug(
+      `Skipping non-OZ admin_transfer_completed event at ledger ${event.ledger.sequence} - ` +
+        `missing expected field (previous_admin)`
+    );
+    return;
+  }
+
   const previousAdmin = eventData.previous_admin as string;
+
+  // Validate previous_admin is a valid address
+  if (!isValidStellarAddress(previousAdmin)) {
+    logger.debug(
+      `Skipping non-OZ admin_transfer_completed event at ledger ${event.ledger.sequence} - ` +
+        `invalid previous_admin format`
+    );
+    return;
+  }
 
   // Create event record
   const eventId = `${event.id}-admin-complete`;
@@ -244,10 +433,10 @@ export async function handleAdminTransferCompleted(
     account: newAdmin,
     admin: previousAdmin,
     type: EventType.ADMIN_TRANSFER_COMPLETED,
-    blockHeight: BigInt(event.ledger!.sequence),
+    blockHeight: BigInt(event.ledger.sequence),
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
-    ledger: event.ledger!.sequence,
+    ledger: event.ledger.sequence,
   });
 
   // Update contract metadata
@@ -265,38 +454,72 @@ export async function handleAdminTransferCompleted(
  * Event signature: OwnershipTransfer { old_owner: Address, new_owner: Address, live_until_ledger: u32 }
  * Topics: ["ownership_transfer"]
  * Data: struct/map with old_owner, new_owner, live_until_ledger fields
+ *
+ * OpenZeppelin event structure has exactly 1 topic (event name only).
+ * Data validation is used to confirm OZ format.
  */
 export async function handleOwnershipTransferStarted(
   event: SorobanEvent
 ): Promise<void> {
+  // Validate event has required ledger info
+  if (!hasValidLedgerInfo(event)) {
+    logger.warn('Skipping ownership_transfer event - missing ledger info');
+    return;
+  }
+
   logger.info(
-    `Processing OwnershipTransferStarted event at ledger ${
-      event.ledger!.sequence
-    }`
+    `Processing OwnershipTransferStarted event at ledger ${event.ledger.sequence}`
   );
 
-  const contractAddress = event.contractId?.contractId().toString()!;
+  // Validate OpenZeppelin event structure: exactly 1 topic (event_name)
+  if (event.topic.length !== 1) {
+    logger.debug(
+      `Skipping non-OZ ownership_transfer event at ledger ${event.ledger.sequence} - ` +
+        `expected 1 topic, got ${event.topic.length}`
+    );
+    return;
+  }
+
+  // Extract and validate contract address
+  const contractAddress = getContractAddress(event);
+  if (!contractAddress) {
+    logger.debug(
+      `Skipping ownership_transfer event at ledger ${event.ledger.sequence} - ` +
+        `invalid contract address`
+    );
+    return;
+  }
 
   // The event.value is a struct/map with old_owner, new_owner, live_until_ledger
-  const eventData = scValToNative(event.value);
-  logger.info(`OwnershipTransfer eventData: ${JSON.stringify(eventData)}`);
+  const eventData = safeScValToNative<Record<string, unknown>>(event.value);
 
-  let oldOwner: string;
-  let newOwner: string;
+  if (!eventData || typeof eventData !== 'object' || Array.isArray(eventData)) {
+    logger.debug(
+      `Skipping non-OZ ownership_transfer event at ledger ${event.ledger.sequence} - ` +
+        `unexpected data structure`
+    );
+    return;
+  }
 
-  if (eventData && typeof eventData === 'object' && !Array.isArray(eventData)) {
-    const dataObj = eventData as Record<string, unknown>;
-    oldOwner = dataObj.old_owner as string;
-    newOwner = dataObj.new_owner as string;
-  } else {
-    logger.error(
-      `Unexpected eventData structure for OwnershipTransferStarted: ${JSON.stringify(
-        eventData
-      )}`
+  // Validate OZ data structure has expected fields
+  if (!('old_owner' in eventData) || !('new_owner' in eventData)) {
+    logger.debug(
+      `Skipping non-OZ ownership_transfer event at ledger ${event.ledger.sequence} - ` +
+        `missing expected fields (old_owner, new_owner)`
     );
-    throw new Error(
-      `Invalid event data structure at ledger ${event.ledger!.sequence}`
+    return;
+  }
+
+  const oldOwner = eventData.old_owner as string;
+  const newOwner = eventData.new_owner as string;
+
+  // Validate addresses are in valid Stellar format
+  if (!isValidStellarAddress(oldOwner) || !isValidStellarAddress(newOwner)) {
+    logger.debug(
+      `Skipping non-OZ ownership_transfer event at ledger ${event.ledger.sequence} - ` +
+        `invalid owner address format`
     );
+    return;
   }
 
   // Create event record
@@ -308,10 +531,10 @@ export async function handleOwnershipTransferStarted(
     account: newOwner, // The new owner receiving ownership
     admin: oldOwner, // The current owner transferring ownership
     type: EventType.OWNERSHIP_TRANSFER_STARTED,
-    blockHeight: BigInt(event.ledger!.sequence),
+    blockHeight: BigInt(event.ledger.sequence),
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
-    ledger: event.ledger!.sequence,
+    ledger: event.ledger.sequence,
   });
 
   await accessEvent.save();
@@ -322,22 +545,71 @@ export async function handleOwnershipTransferStarted(
  * Event signature: ownership_transfer_completed(new_owner: Address)
  * Topics: ["ownership_transfer_completed"]
  * Data: { new_owner: Address } (struct/map)
+ *
+ * OpenZeppelin event structure has exactly 1 topic (event name only).
+ * Data validation is used to confirm OZ format.
  */
 export async function handleOwnershipTransferCompleted(
   event: SorobanEvent
 ): Promise<void> {
+  // Validate event has required ledger info
+  if (!hasValidLedgerInfo(event)) {
+    logger.warn(
+      'Skipping ownership_transfer_completed event - missing ledger info'
+    );
+    return;
+  }
+
   logger.info(
-    `Processing OwnershipTransferCompleted event at ledger ${
-      event.ledger!.sequence
-    }`
+    `Processing OwnershipTransferCompleted event at ledger ${event.ledger.sequence}`
   );
 
-  const contractAddress = event.contractId?.contractId().toString()!;
+  // Validate OpenZeppelin event structure: exactly 1 topic (event_name)
+  if (event.topic.length !== 1) {
+    logger.debug(
+      `Skipping non-OZ ownership_transfer_completed event at ledger ${event.ledger.sequence} - ` +
+        `expected 1 topic, got ${event.topic.length}`
+    );
+    return;
+  }
+
+  // Extract and validate contract address
+  const contractAddress = getContractAddress(event);
+  if (!contractAddress) {
+    logger.debug(
+      `Skipping ownership_transfer_completed event at ledger ${event.ledger.sequence} - ` +
+        `invalid contract address`
+    );
+    return;
+  }
 
   // The event.value is a struct (Map) containing { new_owner: Address }
   // scValToNative automatically converts Maps to JS objects
-  const eventData = scValToNative(event.value) as Record<string, unknown>;
+  const eventData = safeScValToNative<Record<string, unknown>>(event.value);
+
+  // Validate OZ data structure has expected field
+  if (
+    !eventData ||
+    typeof eventData !== 'object' ||
+    !('new_owner' in eventData)
+  ) {
+    logger.debug(
+      `Skipping non-OZ ownership_transfer_completed event at ledger ${event.ledger.sequence} - ` +
+        `missing expected field (new_owner)`
+    );
+    return;
+  }
+
   const newOwner = eventData.new_owner as string;
+
+  // Validate new_owner is a valid address
+  if (!isValidStellarAddress(newOwner)) {
+    logger.debug(
+      `Skipping non-OZ ownership_transfer_completed event at ledger ${event.ledger.sequence} - ` +
+        `invalid new_owner format`
+    );
+    return;
+  }
 
   // Previous owner is not available in this event
   const previousOwner = undefined;
@@ -351,10 +623,10 @@ export async function handleOwnershipTransferCompleted(
     account: newOwner,
     admin: previousOwner,
     type: EventType.OWNERSHIP_TRANSFER_COMPLETED,
-    blockHeight: BigInt(event.ledger!.sequence),
+    blockHeight: BigInt(event.ledger.sequence),
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
-    ledger: event.ledger!.sequence,
+    ledger: event.ledger.sequence,
   });
 
   // Update or create ownership record
@@ -379,44 +651,69 @@ export async function handleOwnershipTransferCompleted(
 
 /**
  * Handler for OwnershipRenounced events from Ownable contracts
- * Event signature: ownership_renounced(old_owner: Address)
- * Topics: ["ownership_renounced"] (old_owner may be in topic[1] or event.value depending on contract version)
- * Data: old_owner (Address) or empty
+ * Event signature: OwnershipRenounced { old_owner: Address }
+ * Topics: ["ownership_renounced"]
+ * Data: { old_owner: Address }
+ *
+ * OpenZeppelin event structure has exactly 1 topic (event name only).
+ * Data validation is used to confirm OZ format.
  */
 export async function handleOwnershipRenounced(
   event: SorobanEvent
 ): Promise<void> {
+  // Validate event has required ledger info
+  if (!hasValidLedgerInfo(event)) {
+    logger.warn('Skipping ownership_renounced event - missing ledger info');
+    return;
+  }
+
   logger.info(
-    `Processing OwnershipRenounced event at ledger ${event.ledger!.sequence}`
+    `Processing OwnershipRenounced event at ledger ${event.ledger.sequence}`
   );
 
-  const contractAddress = event.contractId?.contractId().toString()!;
-
-  // old_owner should be in topic[1], but check event.value as fallback
-  let oldOwner: string;
-  if (event.topic[1]) {
-    oldOwner = scValToNative(event.topic[1]) as string;
-  } else if (event.value) {
-    const eventData = scValToNative(event.value);
-    if (typeof eventData === 'string') {
-      oldOwner = eventData;
-    } else if (eventData && typeof eventData === 'object') {
-      oldOwner = (eventData as Record<string, unknown>).old_owner as string;
-    } else {
-      logger.error(
-        `Cannot extract old_owner from OwnershipRenounced event at ledger ${
-          event.ledger!.sequence
-        }`
-      );
-      throw new Error(`Invalid event structure`);
-    }
-  } else {
-    logger.error(
-      `No topic[1] or value in OwnershipRenounced event at ledger ${
-        event.ledger!.sequence
-      }`
+  // Validate OpenZeppelin event structure: exactly 1 topic (event_name)
+  if (event.topic.length !== 1) {
+    logger.debug(
+      `Skipping non-OZ ownership_renounced event at ledger ${event.ledger.sequence} - ` +
+        `expected 1 topic, got ${event.topic.length}`
     );
-    throw new Error(`Invalid event structure`);
+    return;
+  }
+
+  // Extract and validate contract address
+  const contractAddress = getContractAddress(event);
+  if (!contractAddress) {
+    logger.debug(
+      `Skipping ownership_renounced event at ledger ${event.ledger.sequence} - ` +
+        `invalid contract address`
+    );
+    return;
+  }
+
+  // old_owner is in the event.value as a struct
+  const eventData = safeScValToNative<Record<string, unknown>>(event.value);
+
+  if (
+    !eventData ||
+    typeof eventData !== 'object' ||
+    !('old_owner' in eventData)
+  ) {
+    logger.debug(
+      `Skipping non-OZ ownership_renounced event at ledger ${event.ledger.sequence} - ` +
+        `missing expected field (old_owner)`
+    );
+    return;
+  }
+
+  const oldOwner = eventData.old_owner as string;
+
+  // Validate old_owner is a valid address
+  if (!isValidStellarAddress(oldOwner)) {
+    logger.debug(
+      `Skipping non-OZ ownership_renounced event at ledger ${event.ledger.sequence} - ` +
+        `invalid old_owner format`
+    );
+    return;
   }
 
   // Create event record
@@ -428,10 +725,10 @@ export async function handleOwnershipRenounced(
     account: oldOwner,
     admin: undefined,
     type: EventType.OWNERSHIP_RENOUNCED,
-    blockHeight: BigInt(event.ledger!.sequence),
+    blockHeight: BigInt(event.ledger.sequence),
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
-    ledger: event.ledger!.sequence,
+    ledger: event.ledger.sequence,
   });
 
   // Remove ownership record
@@ -449,42 +746,52 @@ export async function handleOwnershipRenounced(
 
 /**
  * Handler for AdminRenounced events from Access Control contracts
- * Event signature: admin_renounced(admin: Address)
- * Topics: ["admin_renounced"] (admin may be in topic[1] or event.value depending on contract version)
- * Data: admin (Address) or empty
+ * Event signature: AdminRenounced { admin: Address (topic) }
+ * Topics: ["admin_renounced", admin]
+ * Data: empty
+ *
+ * OpenZeppelin event structure has exactly 2 topics.
  */
 export async function handleAdminRenounced(event: SorobanEvent): Promise<void> {
+  // Validate event has required ledger info
+  if (!hasValidLedgerInfo(event)) {
+    logger.warn('Skipping admin_renounced event - missing ledger info');
+    return;
+  }
+
   logger.info(
-    `Processing AdminRenounced event at ledger ${event.ledger!.sequence}`
+    `Processing AdminRenounced event at ledger ${event.ledger.sequence}`
   );
 
-  const contractAddress = event.contractId?.contractId().toString()!;
-
-  // admin should be in topic[1], but check event.value as fallback
-  let admin: string;
-  if (event.topic[1]) {
-    admin = scValToNative(event.topic[1]) as string;
-  } else if (event.value) {
-    const eventData = scValToNative(event.value);
-    if (typeof eventData === 'string') {
-      admin = eventData;
-    } else if (eventData && typeof eventData === 'object') {
-      admin = (eventData as Record<string, unknown>).admin as string;
-    } else {
-      logger.error(
-        `Cannot extract admin from AdminRenounced event at ledger ${
-          event.ledger!.sequence
-        }`
-      );
-      throw new Error(`Invalid event structure`);
-    }
-  } else {
-    logger.error(
-      `No topic[1] or value in AdminRenounced event at ledger ${
-        event.ledger!.sequence
-      }`
+  // Validate OpenZeppelin event structure: exactly 2 topics (event_name, admin)
+  if (event.topic.length !== 2) {
+    logger.debug(
+      `Skipping non-OZ admin_renounced event at ledger ${event.ledger.sequence} - ` +
+        `expected 2 topics, got ${event.topic.length}`
     );
-    throw new Error(`Invalid event structure`);
+    return;
+  }
+
+  // Extract and validate contract address
+  const contractAddress = getContractAddress(event);
+  if (!contractAddress) {
+    logger.debug(
+      `Skipping admin_renounced event at ledger ${event.ledger.sequence} - ` +
+        `invalid contract address`
+    );
+    return;
+  }
+
+  // admin is in topic[1]
+  const admin = safeScValToNative<string>(event.topic[1]);
+
+  // Validate admin is a valid address
+  if (!isValidStellarAddress(admin)) {
+    logger.debug(
+      `Skipping non-OZ admin_renounced event at ledger ${event.ledger.sequence} - ` +
+        `invalid admin format`
+    );
+    return;
   }
 
   // Create event record
@@ -496,10 +803,10 @@ export async function handleAdminRenounced(event: SorobanEvent): Promise<void> {
     account: admin,
     admin: undefined,
     type: EventType.ADMIN_RENOUNCED,
-    blockHeight: BigInt(event.ledger!.sequence),
+    blockHeight: BigInt(event.ledger.sequence),
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
-    ledger: event.ledger!.sequence,
+    ledger: event.ledger.sequence,
   });
 
   // Update contract metadata
@@ -514,29 +821,90 @@ export async function handleAdminRenounced(event: SorobanEvent): Promise<void> {
 
 /**
  * Handler for RoleAdminChanged events from Access Control contracts
- * Event signature: role_admin_changed(role: Symbol, previous_admin_role: Symbol, new_admin_role: Symbol)
+ * Event signature: RoleAdminChanged { role: Symbol (topic), previous_admin_role: Symbol, new_admin_role: Symbol }
  * Topics: ["role_admin_changed", role: Symbol]
  * Data: { previous_admin_role: Symbol, new_admin_role: Symbol }
  *
  * Note: This event does NOT involve an account - it's about changing which role
  * administers another role. We store role names in admin fields for reference.
+ *
+ * OpenZeppelin event structure has exactly 2 topics.
  */
 export async function handleRoleAdminChanged(
   event: SorobanEvent
 ): Promise<void> {
+  // Validate event has required ledger info
+  if (!hasValidLedgerInfo(event)) {
+    logger.warn('Skipping role_admin_changed event - missing ledger info');
+    return;
+  }
+
   logger.info(
-    `Processing RoleAdminChanged event at ledger ${event.ledger!.sequence}`
+    `Processing RoleAdminChanged event at ledger ${event.ledger.sequence}`
   );
 
-  const contractAddress = event.contractId?.contractId().toString()!;
+  // Validate OpenZeppelin event structure: exactly 2 topics (event_name, role)
+  if (event.topic.length !== 2) {
+    logger.debug(
+      `Skipping non-OZ role_admin_changed event at ledger ${event.ledger.sequence} - ` +
+        `expected 2 topics, got ${event.topic.length}`
+    );
+    return;
+  }
+
+  // Extract and validate contract address
+  const contractAddress = getContractAddress(event);
+  if (!contractAddress) {
+    logger.debug(
+      `Skipping role_admin_changed event at ledger ${event.ledger.sequence} - ` +
+        `invalid contract address`
+    );
+    return;
+  }
 
   // role is in topic[1]
-  const role = scValToNative(event.topic[1]) as string;
+  const role = safeScValToNative<string>(event.topic[1]);
+
+  // Validate role is a valid symbol
+  if (!isValidRoleSymbol(role)) {
+    logger.debug(
+      `Skipping non-OZ role_admin_changed event at ledger ${event.ledger.sequence} - ` +
+        `invalid role format`
+    );
+    return;
+  }
 
   // previous_admin_role and new_admin_role are in event.value (data)
-  const eventData = scValToNative(event.value) as Record<string, unknown>;
+  const eventData = safeScValToNative<Record<string, unknown>>(event.value);
+
+  // Validate OZ data structure has expected fields
+  if (
+    !eventData ||
+    typeof eventData !== 'object' ||
+    !('previous_admin_role' in eventData) ||
+    !('new_admin_role' in eventData)
+  ) {
+    logger.debug(
+      `Skipping non-OZ role_admin_changed event at ledger ${event.ledger.sequence} - ` +
+        `missing expected fields (previous_admin_role, new_admin_role)`
+    );
+    return;
+  }
+
   const previousAdminRole = eventData.previous_admin_role as string;
   const newAdminRole = eventData.new_admin_role as string;
+
+  // Validate admin roles are valid symbols (note: previous_admin_role can be empty string for first-time set)
+  if (
+    typeof previousAdminRole !== 'string' ||
+    !isValidRoleSymbol(newAdminRole)
+  ) {
+    logger.debug(
+      `Skipping non-OZ role_admin_changed event at ledger ${event.ledger.sequence} - ` +
+        `invalid admin role format`
+    );
+    return;
+  }
 
   // Create event record
   // Note: This event doesn't involve an account address - it's about role-to-role relationships
@@ -552,10 +920,10 @@ export async function handleRoleAdminChanged(
     previousAdminRole: previousAdminRole, // Store for audit trail
     newAdminRole: newAdminRole, // Store for audit trail
     type: EventType.ROLE_ADMIN_CHANGED,
-    blockHeight: BigInt(event.ledger!.sequence),
+    blockHeight: BigInt(event.ledger.sequence),
     timestamp: new Date(event.ledgerClosedAt),
     txHash: event.transaction?.hash || 'unknown',
-    ledger: event.ledger!.sequence,
+    ledger: event.ledger.sequence,
   });
 
   // Update contract metadata
@@ -574,15 +942,26 @@ export async function handleRoleAdminChanged(
 export async function handleContractDeployment(
   op: StellarOperation
 ): Promise<void> {
-  logger.info(
-    `Processing contract deployment at ledger ${op.ledger!.sequence}`
-  );
+  // Validate operation has required ledger info
+  if (!op.ledger || typeof op.ledger.sequence !== 'number') {
+    logger.warn('Skipping contract deployment - missing ledger info');
+    return;
+  }
+
+  logger.info(`Processing contract deployment at ledger ${op.ledger.sequence}`);
 
   // Extract contract address from the operation
   // This logic assumes a standard Soroban contract deployment.
   // In a real scenario, extraction depends on the specific invokeHostFunction structure
   // For MVP, we use the transaction source account or a placeholder if direct ID isn't easily available in this view
   const contractAddress = op.source_account;
+
+  if (!contractAddress) {
+    logger.warn(
+      `Skipping contract deployment at ledger ${op.ledger.sequence} - missing source account`
+    );
+    return;
+  }
 
   const contract = Contract.create({
     id: contractAddress,

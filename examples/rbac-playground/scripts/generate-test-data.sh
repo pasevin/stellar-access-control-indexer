@@ -6,9 +6,9 @@
 # It executes multiple transactions to generate all possible event types.
 #
 # Usage:
-#   ./generate-test-data.sh <CONTRACT_ID> [ADMIN_ADDRESS]
+#   ./generate-test-data.sh <CONTRACT_ID> [ADMIN_SOURCE]
 #
-# If ADMIN_ADDRESS is not provided, it uses the 'default' soroban identity.
+# ADMIN_SOURCE is the name of the soroban identity to use (default: 'default')
 # =============================================================================
 
 set -e
@@ -24,16 +24,18 @@ NC='\033[0m' # No Color
 if [ -z "$1" ]; then
     echo -e "${RED}Error: Contract ID is required${NC}"
     echo ""
-    echo "Usage: $0 <CONTRACT_ID> [ADMIN_ADDRESS]"
+    echo "Usage: $0 <CONTRACT_ID> [ADMIN_SOURCE]"
     echo ""
     echo "Example:"
     echo "  $0 CAHHWNLOHIGFHYG7VOXNVK5EKLL25RIGNGUFLTTUUWZSQW5GGIPGXDKT"
+    echo "  $0 CAHHWNLOHIGFHYG7VOXNVK5EKLL25RIGNGUFLTTUUWZSQW5GGIPGXDKT new-owner"
     echo ""
     exit 1
 fi
 
 CONTRACT=$1
-ADMIN=${2:-$(soroban keys address default)}
+ADMIN_SOURCE=${2:-default}
+ADMIN=$(soroban keys address "$ADMIN_SOURCE")
 NETWORK="testnet"
 
 echo -e "${BLUE}=============================================${NC}"
@@ -41,7 +43,7 @@ echo -e "${BLUE}  RBAC Playground - Test Data Generator${NC}"
 echo -e "${BLUE}=============================================${NC}"
 echo ""
 echo -e "${GREEN}Contract:${NC} $CONTRACT"
-echo -e "${GREEN}Admin:${NC}    $ADMIN"
+echo -e "${GREEN}Admin:${NC}    $ADMIN (source: $ADMIN_SOURCE)"
 echo -e "${GREEN}Network:${NC}  $NETWORK"
 echo ""
 
@@ -75,7 +77,7 @@ invoke() {
     local desc=$1
     shift
     echo -e "  ${BLUE}→${NC} $desc"
-    soroban contract invoke --id $CONTRACT --source default --network $NETWORK -- "$@" 2>&1 | grep -E "(Success|Error)" || true
+    soroban contract invoke --id $CONTRACT --source "$ADMIN_SOURCE" --network $NETWORK -- "$@" 2>&1 | grep -E "(Success|Error)" || true
 }
 
 # =============================================================================
