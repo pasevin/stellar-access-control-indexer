@@ -303,16 +303,18 @@ export async function handleAdminTransferInitiated(
   if (
     !eventData ||
     typeof eventData !== 'object' ||
-    !('new_admin' in eventData)
+    !('new_admin' in eventData) ||
+    !('live_until_ledger' in eventData)
   ) {
     logger.debug(
       `Skipping non-OZ admin_transfer_initiated event at ledger ${event.ledger.sequence} - ` +
-        `missing expected field (new_admin)`
+        `missing expected fields (new_admin, live_until_ledger)`
     );
     return;
   }
 
   const newAdmin = eventData.new_admin as string;
+  const liveUntilLedger = eventData.live_until_ledger;
 
   // Validate new_admin is a valid address
   if (!isValidStellarAddress(newAdmin)) {
@@ -323,7 +325,14 @@ export async function handleAdminTransferInitiated(
     return;
   }
 
-  const liveUntilLedger = eventData.live_until_ledger as number;
+  // Validate live_until_ledger is a number
+  if (typeof liveUntilLedger !== 'number') {
+    logger.debug(
+      `Skipping non-OZ admin_transfer_initiated event at ledger ${event.ledger.sequence} - ` +
+        `invalid live_until_ledger format`
+    );
+    return;
+  }
 
   // Create event record
   const eventId = `${event.id}-admin-init`;
