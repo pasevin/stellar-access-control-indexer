@@ -43,7 +43,7 @@ const project: StellarProject = {
     {
       kind: StellarDatasourceKind.Runtime,
       // Start from early testnet blocks with OZ contract activity
-      startBlock: 1944575,
+      startBlock: 2053723,
       mapping: {
         file: './dist/index.js',
         handlers: [
